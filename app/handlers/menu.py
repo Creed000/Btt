@@ -127,21 +127,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["time"] = text
 
         await update.message.reply_text(
-        f"""📋 Подтверждение записи
-
-    🏙 Город: {context.user_data.get('city')}
-    📂 Категория: {context.user_data.get('category')}
-    👤 Мастер: {context.user_data.get('master')}
-    📅 Дата: {context.user_data.get('date')}
-    🕒 Время: {context.user_data.get('time')}
-
-    Подтвердить запись?""",
-        reply_markup=confirm_menu(),
-        )
-
-        context.user_data["time"] = text
-
-        await update.message.reply_text(
             f"""📋 Подтверждение записи
 
     🏙 Город: {context.user_data.get('city')}
