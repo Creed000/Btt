@@ -148,7 +148,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_id=1,
             booking_time=booking_time,
         )
-
+        
+        context.user_data.clear()
         await update.message.reply_text(
             "🎉 Запись успешно создана!\n\n"
             "Спасибо за использование BTT.",
@@ -178,11 +179,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⚙️ Раздел настроек скоро появится."
         )
 
-    elif text == "🏠 Главное меню":
+    elif text == "⬅️ Назад":
         await update.message.reply_text(
-            "Вы уже находитесь в главном меню."
+            "🏠 Главное меню",
+            reply_markup=main_menu(),
         )
-
     else:
         await update.message.reply_text(
             "Пожалуйста, используйте кнопки меню."
