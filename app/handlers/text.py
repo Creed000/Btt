@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 
 from app.handlers.booking import booking
 from app.keyboards.category import category_menu
-
+from app.handlers.profile import profile
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -14,7 +14,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await booking(update, context)
 
     elif text == "👤 Личный кабинет":
-        await update.message.reply_text("👤 Личный кабинет")
+        await profile(update, context)
 
     elif text == "❤️ Избранное":
         await update.message.reply_text("❤️ Избранное")
