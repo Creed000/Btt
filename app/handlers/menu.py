@@ -19,6 +19,18 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "📅 Записаться":
         await booking(update, context)
+    elif text == "👤 Личный кабинет":
+        await profile(update, context)
+
+    elif text == "❤️ Избранное":
+        await update.message.reply_text(
+        "❤️ Пока здесь пусто."
+        )
+
+    elif text == "⚙️ Настройки":
+        await update.message.reply_text(
+            "⚙️ Настройки появятся в следующем обновлении."
+        )
 
     elif text == "🏙 Бишкек":
         context.user_data["city"] = "Бишкек"
