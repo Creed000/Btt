@@ -156,7 +156,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "✅ Подтвердить":
 
-         booking_time = datetime.now()
+        booking_time = datetime.now()
 
         create_booking(
             client_id=update.effective_user.id,
