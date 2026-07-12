@@ -5,6 +5,7 @@ from app.handlers.booking import booking
 from app.handlers.profile import profile
 
 from app.keyboards.category import category_menu
+from app.keyboards.master import master_menu
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -16,6 +17,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🏙 Бишкек":
         context.user_data["city"] = "Бишкек"
+
         await update.message.reply_text(
             "✅ Вы выбрали Бишкек.\n\n📂 Теперь выберите категорию.",
             reply_markup=category_menu(),
@@ -23,6 +25,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🏙 Ош":
         context.user_data["city"] = "Ош"
+
         await update.message.reply_text(
             "✅ Вы выбрали Ош.\n\n📂 Теперь выберите категорию.",
             reply_markup=category_menu(),
@@ -30,9 +33,42 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "🏙 Джалал-Абад":
         context.user_data["city"] = "Джалал-Абад"
+
         await update.message.reply_text(
             "✅ Вы выбрали Джалал-Абад.\n\n📂 Теперь выберите категорию.",
             reply_markup=category_menu(),
+        )
+
+    elif text == "💇 Волосы":
+        context.user_data["category"] = "hair"
+
+        await update.message.reply_text(
+            "💇 Выберите мастера",
+            reply_markup=master_menu(),
+        )
+
+    elif text == "💅 Маникюр":
+        context.user_data["category"] = "nails"
+
+        await update.message.reply_text(
+            "💅 Выберите мастера",
+            reply_markup=master_menu(),
+        )
+
+    elif text == "👁 Ресницы":
+        context.user_data["category"] = "lashes"
+
+        await update.message.reply_text(
+            "👁 Выберите мастера",
+            reply_markup=master_menu(),
+        )
+
+    elif text == "💆 Массаж":
+        context.user_data["category"] = "massage"
+
+        await update.message.reply_text(
+            "💆 Выберите мастера",
+            reply_markup=master_menu(),
         )
 
     elif text == "👤 Личный кабинет":
