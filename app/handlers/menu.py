@@ -81,7 +81,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["master"] = name
 
-    await update.message.reply_text(
+        await update.message.reply_text(
             "📅 Выберите дату",
             reply_markup=date_menu(),
         )
