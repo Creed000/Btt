@@ -181,19 +181,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu(),
         )
 
-    elif text == "👤 Личный кабинет":
-        await profile(update, context)
-
-    elif text == "❤️ Избранное":
-        await update.message.reply_text(
-            "❤️ У вас пока нет избранных мастеров."
-        )
-
-    elif text == "⚙️ Настройки":
-        await update.message.reply_text(
-            "⚙️ Раздел настроек скоро появится."
-        )
-
+    
     elif text == "⬅️ Назад":
         await update.message.reply_text(
             "🏠 Главное меню",
