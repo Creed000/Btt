@@ -39,16 +39,20 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Категории
     elif text == "💇 Волосы":
-        await update.message.reply_text("Раздел 'Волосы' скоро появится.")
+        from app.handlers.menu import menu_handler
+        await menu_handler(update, context)
 
     elif text == "💅 Маникюр":
-        await update.message.reply_text("Раздел 'Маникюр' скоро появится.")
+        from app.handlers.menu import menu_handler
+        await menu_handler(update, context)
 
     elif text == "👁 Ресницы":
-        await update.message.reply_text("Раздел 'Ресницы' скоро появится.")
+        from app.handlers.menu import menu_handler
+        await menu_handler(update, context)
 
     elif text == "💆 Массаж":
-        await update.message.reply_text("Раздел 'Массаж' скоро появится.")
+        from app.handlers.menu import menu_handler
+        await menu_handler(update, context)
 
     # Назад
     elif text == "⬅️ Назад":
