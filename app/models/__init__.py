@@ -10,6 +10,7 @@ __all__ = [
     "User",
     "Role",
     "City",
+    "Category",
     "Master",
     "Service",
     "Booking",
