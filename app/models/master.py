@@ -12,12 +12,26 @@ class Master(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
         unique=True,
+        nullable=False,
+    )
+
+    city_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cities.id"),
+        nullable=True,
     )
 
     description: Mapped[str | None] = mapped_column(
         String(1000)
     )
 
-    rating: Mapped[float] = mapped_column(default=5.0)
+    rating: Mapped[float] = mapped_column(
+        default=5.0
+    )
 
     user = relationship("User")
+    city = relationship("City")
+    services = relationship(
+        "Service",
+        back_populates="master",
+        cascade="all, delete-orphan",
+    )
