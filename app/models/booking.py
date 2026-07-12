@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, date, time
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import Date, Time, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -15,12 +15,28 @@ class Booking(Base):
         ForeignKey("clients.id")
     )
 
+    master_id: Mapped[int] = mapped_column(
+        ForeignKey("masters.id")
+    )
+
     service_id: Mapped[int] = mapped_column(
         ForeignKey("services.id")
     )
 
-    booking_time: Mapped[datetime] = mapped_column(
-        DateTime
+    booking_date: Mapped[date] = mapped_column(
+        Date
     )
 
-    status: Mapped[str] = mapped_column(default="new")
+    booking_time: Mapped[time] = mapped_column(
+        Time
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="new"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow
+    )
