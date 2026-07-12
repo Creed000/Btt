@@ -74,30 +74,17 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=master_menu(),
         )
 
-    elif text == "👩 Айжан ⭐4.9":
-        context.user_data["master"] = "Айжан"
+    elif text.startswith("👤"):
 
-        await update.message.reply_text(
-            "📅 Выберите дату",
-            reply_markup=date_menu(),
+        name = text.split("⭐")[0]
+        name = name.replace("👤", "").strip()
+
+        context.user_data["master"] = name
+
+    await update.message.reply_text(
+        "📅 Выберите дату",
+        reply_markup=date_menu(),
         )
-
-    elif text == "👩 Алина ⭐5.0":
-        context.user_data["master"] = "Алина"
-
-        await update.message.reply_text(
-            "📅 Выберите дату",
-            reply_markup=date_menu(),
-        )
-
-    elif text == "👨 Азамат ⭐4.8":
-        context.user_data["master"] = "Азамат"
-
-        await update.message.reply_text(
-            "📅 Выберите дату",
-            reply_markup=date_menu(),
-        )
-
     elif text == "📅 Сегодня":
         context.user_data["date"] = "Сегодня"
 
