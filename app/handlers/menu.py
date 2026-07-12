@@ -10,6 +10,8 @@ from app.keyboards.date import date_menu
 from app.keyboards.time import time_menu
 from app.keyboards.confirm import confirm_menu
 from app.keyboards.main import main_menu
+from app.database.bookings import create_booking
+from datetime import datetime
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -153,6 +155,21 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "✅ Подтвердить":
+
+         booking_time = datetime.now()
+
+        create_booking(
+            client_id=update.effective_user.id,
+            service_id=1,
+            booking_time=booking_time,
+        )
+
+        await update.message.reply_text(
+            "🎉 Запись успешно создана!\n\nСпасибо за использование BTT.",
+            reply_markup=main_menu(),
+        )
+
+        context.user_data.clear()
 
         await update.message.reply_text(
             "🎉 Запись успешно создана!\n\n"
