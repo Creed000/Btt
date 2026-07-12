@@ -6,6 +6,7 @@ from app.handlers.profile import profile
 
 from app.keyboards.category import category_menu
 from app.keyboards.master import master_menu
+from app.keyboards.date import date_menu
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -71,6 +72,30 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=master_menu(),
         )
 
+    elif text == "👩 Айжан ⭐4.9":
+        context.user_data["master"] = "Айжан"
+
+        await update.message.reply_text(
+            "📅 Выберите дату",
+            reply_markup=date_menu(),
+        )
+
+    elif text == "👩 Алина ⭐5.0":
+        context.user_data["master"] = "Алина"
+
+        await update.message.reply_text(
+            "📅 Выберите дату",
+            reply_markup=date_menu(),
+        )
+
+    elif text == "👨 Азамат ⭐4.8":
+        context.user_data["master"] = "Азамат"
+
+        await update.message.reply_text(
+            "📅 Выберите дату",
+            reply_markup=date_menu(),
+        )
+
     elif text == "👤 Личный кабинет":
         await profile(update, context)
 
@@ -81,7 +106,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "⚙️ Настройки":
         await update.message.reply_text(
-            "⚙️ Раздел настроек скоро появится."
+            "⚙️ Раздел настроек скоро появятся."
         )
 
     elif text == "🏠 Главное меню":
