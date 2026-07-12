@@ -170,7 +170,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu(),
         )
 
-        context.user_data.clear()
 
     elif text == "❌ Отменить":
 
