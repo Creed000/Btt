@@ -11,8 +11,8 @@ class Booking(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    client_id: Mapped[int] = mapped_column(
-        ForeignKey("clients.id")
+    client_id = mapped_column(
+        ForeignKey("users.id")
     )
 
     master_id: Mapped[int] = mapped_column(
