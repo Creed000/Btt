@@ -1,19 +1,25 @@
-from telegram import ReplyKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup
+
+from app.repositories.master_repository import get_all_masters
 
 
 def master_menu():
 
-    keyboard = [
+    keyboard = []
 
-        ["👩 Айжан ⭐4.9"],
+    masters = get_all_masters()
 
-        ["👩 Алина ⭐5.0"],
+    for master in masters:
 
-        ["👨 Азамат ⭐4.8"],
+        name = master.user.first_name
 
-        ["⬅️ Назад"]
+        keyboard.append(
+            [KeyboardButton(f"👤 {name} ⭐{master.rating}")]
+        )
 
-    ]
+    keyboard.append(
+        [KeyboardButton("⬅️ Назад")]
+    )
 
     return ReplyKeyboardMarkup(
         keyboard,
