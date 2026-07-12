@@ -1,16 +1,17 @@
-from sqlalchemy.orm import Session
-
+from app.database.session import SessionLocal
 from app.models.booking import Booking
 
 
 def create_booking(
-    db: Session,
-    client_id: int,
-    master_id: int,
-    service_id: int,
+    client_id,
+    master_id,
+    service_id,
     booking_date,
     booking_time,
 ):
+
+    db = SessionLocal()
+
     booking = Booking(
         client_id=client_id,
         master_id=master_id,
@@ -22,5 +23,6 @@ def create_booking(
     db.add(booking)
     db.commit()
     db.refresh(booking)
+    db.close()
 
     return booking
