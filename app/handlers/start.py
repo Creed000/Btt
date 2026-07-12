@@ -31,3 +31,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu(),
 
     )
+from telegram.ext import CommandHandler
+
+start_handler = CommandHandler("start", start)
