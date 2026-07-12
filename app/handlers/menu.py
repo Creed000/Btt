@@ -165,13 +165,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            "🎉 Запись успешно создана!\n\nСпасибо за использование BTT.",
-            reply_markup=main_menu(),
-        )
-
-        context.user_data.clear()
-
-        await update.message.reply_text(
             "🎉 Запись успешно создана!\n\n"
             "Спасибо за использование BTT.",
             reply_markup=main_menu(),
