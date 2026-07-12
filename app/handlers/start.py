@@ -4,7 +4,6 @@ from telegram.ext import ContextTypes, CommandHandler
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
 from app.services.user_service import UserService
-from app.services.client_service import ClientService
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -15,12 +14,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db,
             update.effective_user,
         )
-
-        ClientService.create_if_not_exists(
-            db,
-            user.id,
-        )
-
     finally:
         db.close()
 
