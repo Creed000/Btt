@@ -4,12 +4,36 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 from app.handlers.booking import booking
 from app.handlers.profile import profile
 
+from app.keyboards.category import category_menu
+
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     text = update.message.text
 
     if text == "📅 Записаться":
         await booking(update, context)
+
+    elif text == "🏙 Бишкек":
+        context.user_data["city"] = "Бишкек"
+        await update.message.reply_text(
+            "✅ Вы выбрали Бишкек.\n\n📂 Теперь выберите категорию.",
+            reply_markup=category_menu(),
+        )
+
+    elif text == "🏙 Ош":
+        context.user_data["city"] = "Ош"
+        await update.message.reply_text(
+            "✅ Вы выбрали Ош.\n\n📂 Теперь выберите категорию.",
+            reply_markup=category_menu(),
+        )
+
+    elif text == "🏙 Джалал-Абад":
+        context.user_data["city"] = "Джалал-Абад"
+        await update.message.reply_text(
+            "✅ Вы выбрали Джалал-Абад.\n\n📂 Теперь выберите категорию.",
+            reply_markup=category_menu(),
+        )
 
     elif text == "👤 Личный кабинет":
         await profile(update, context)
