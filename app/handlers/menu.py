@@ -148,14 +148,14 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_id=1,
             booking_time=booking_time,
         )
-        
+
         context.user_data.clear()
+
         await update.message.reply_text(
             "🎉 Запись успешно создана!\n\n"
             "Спасибо за использование BTT.",
             reply_markup=main_menu(),
         )
-
 
     elif text == "❌ Отменить":
 
