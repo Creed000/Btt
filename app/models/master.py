@@ -29,7 +29,12 @@ class Master(Base):
     )
 
     user = relationship("User")
-    city = relationship("City")
+
+    city = relationship(
+        "City",
+        back_populates="masters"
+    )
+
     services = relationship(
         "Service",
         back_populates="master",
