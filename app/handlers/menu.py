@@ -9,7 +9,7 @@ from app.keyboards.master import master_menu
 from app.keyboards.date import date_menu
 from app.keyboards.time import time_menu
 from app.keyboards.confirm import confirm_menu
-
+from app.keyboards.main import main_menu
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -155,7 +155,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "✅ Подтвердить":
 
         await update.message.reply_text(
-            "🎉 Запись успешно создана!\n\nСпасибо за использование BTT."
+            "🎉 Запись успешно создана!\n\n"
+            "Спасибо за использование BTT.",
+            reply_markup=main_menu(),
         )
 
         context.user_data.clear()
@@ -165,7 +167,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
         await update.message.reply_text(
-            "❌ Запись отменена."
+            "❌ Запись отменена.",
+            reply_markup=main_menu(),
         )
 
     elif text == "👤 Личный кабинет":
