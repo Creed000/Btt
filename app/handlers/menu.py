@@ -8,6 +8,7 @@ from app.keyboards.category import category_menu
 from app.keyboards.master import master_menu
 from app.keyboards.date import date_menu
 from app.keyboards.time import time_menu
+from app.keyboards.confirm import confirm_menu
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,6 +120,48 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🕒 Выберите время",
             reply_markup=time_menu(),
+        )
+
+    elif text in [
+        "🕘 09:00",
+        "🕙 10:00",
+        "🕚 11:00",
+        "🕛 12:00",
+        "🕐 13:00",
+        "🕑 14:00",
+        "🕒 15:00",
+        "🕓 16:00",
+    ]:
+
+        context.user_data["time"] = text
+
+        await update.message.reply_text(
+            f"""📋 Подтверждение записи
+
+🏙 Город: {context.user_data.get('city')}
+📂 Категория: {context.user_data.get('category')}
+👤 Мастер: {context.user_data.get('master')}
+📅 Дата: {context.user_data.get('date')}
+🕒 Время: {context.user_data.get('time')}
+
+Подтвердить запись?""",
+            reply_markup=confirm_menu(),
+        )
+
+    elif text == "✅ Подтвердить":
+
+        await update.message.reply_text(
+            "🎉 Запись успешно создана!\n\nСпасибо за использование BTT."
+        )
+
+        context.user_data.clear()
+
+    elif text == "❌ Отменить":
+
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            "❌ Запись отменена."
         )
 
     elif text == "👤 Личный кабинет":
