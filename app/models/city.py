@@ -1,5 +1,5 @@
 from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -15,3 +15,8 @@ class City(Base):
     )
 
     is_active: Mapped[bool] = mapped_column(default=True)
+
+    masters = relationship(
+        "Master",
+        back_populates="city"
+    )
