@@ -65,3 +65,9 @@ class User(Base):
         back_populates="user",
         uselist=False,
     )
+
+    client: Mapped["Client"] = relationship(
+        "Client",
+        back_populates="user",
+        uselist=False,
+    )
