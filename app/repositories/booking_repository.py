@@ -1,28 +1,72 @@
-from app.database.session import SessionLocal
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.models.booking import Booking
 
 
-def create_booking(
-    client_id,
-    master_id,
-    service_id,
-    booking_date,
-    booking_time,
-):
+class BookingRepository:
 
-    db = SessionLocal()
+    @staticmethod
+    def get_by_id(
+        db: Session,
+        booking_id: int,
+    ) -> Booking | None:
+        return db.scalar(
+            select(Booking).where(
+                Booking.id == booking_id
+            )
+        )
 
-    booking = Booking(
-        client_id=client_id,
-        master_id=master_id,
-        service_id=service_id,
-        booking_date=booking_date,
-        booking_time=booking_time,
-    )
+    @staticmethod
+    def get_by_master(
+        db: Session,
+        master_id: int,
+    ) -> list[Booking]:
+        return list(
+            db.scalars(
+                select(Booking).where(
+                    Booking.master_id == master_id
+                )
+            ).all()
+        )
 
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
-    db.close()
+    @staticmethod
+    def get_by_client(
+        db: Session,
+        client_id: int,
+    ) -> list[Booking]:
+        return list(
+            db.scalars(
+                select(Booking).where(
+                    Booking.client_id == client_id
+                )
+            ).all()
+        )
 
-    return booking
+    @staticmethod
+    def create(
+        db: Session,
+        booking: Booking,
+    ) -> Booking:
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+        return booking
+
+    @staticmethod
+    def update(
+        db: Session,
+        booking: Booking,
+    ) -> Booking:
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+        return booking
+
+    @staticmethod
+    def delete(
+        db: Session,
+        booking: Booking,
+    ) -> None:
+        db.delete(booking)
+        db.commit()
