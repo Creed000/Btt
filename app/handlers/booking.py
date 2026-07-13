@@ -9,18 +9,14 @@ from app.keyboards.city import city_menu
 
 
 async def booking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-
-    if text != "📅 Записаться":
-        return
-
-    await update.message.reply_text(
-        "📅 Выберите город",
-        reply_markup=city_menu(),
-    )
+    if update.message.text == "📅 Записаться":
+        await update.message.reply_text(
+            "📅 Выберите город",
+            reply_markup=city_menu(),
+        )
 
 
 booking_handler = MessageHandler(
-    filters.Regex(r"^📅 Записаться$"),
+    filters.TEXT & filters.Regex(r"^📅 Записаться$"),
     booking,
 )
