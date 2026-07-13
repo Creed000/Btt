@@ -1,10 +1,24 @@
 from telegram import Update
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
 
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Поиск мастеров")
+    text = update.message.text
+
+    if text != "🔍 Найти мастера":
+        return
+
+    await update.message.reply_text(
+        "🔍 Поиск мастеров\n\n"
+        "Функция находится в разработке."
+    )
+
 
 search_handler = MessageHandler(
-    filters.Regex("^🔍 Найти мастера$"),
+    filters.TEXT & ~filters.COMMAND,
     search,
 )
