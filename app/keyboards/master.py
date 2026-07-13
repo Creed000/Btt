@@ -1,20 +1,21 @@
 from telegram import KeyboardButton, ReplyKeyboardMarkup
+from sqlalchemy.orm import Session
 
-from app.repositories.master_repository import get_all_masters
+from app.repositories.master_repository import MasterRepository
 
 
-def master_menu():
+def master_menu(db: Session):
 
     keyboard = []
 
-    masters = get_all_masters()
+    masters = MasterRepository.get_all(db)
 
     for master in masters:
 
-        name = master.user.first_name
+        name = master.user.first_name or "Без имени"
 
         keyboard.append(
-            [KeyboardButton(f"👤 {name} ⭐{master.rating}")]
+            [KeyboardButton(f"👤 {name} ⭐ {master.rating}")]
         )
 
     keyboard.append(
