@@ -1,32 +1,57 @@
-from app.database.session import SessionLocal
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.models.service import Service
 
 
-def get_service(service_id: int):
+class ServiceRepository:
 
-    db = SessionLocal()
+    @staticmethod
+    def get_by_id(
+        db: Session,
+        service_id: int,
+    ) -> Service | None:
+        return db.scalar(
+            select(Service).where(Service.id == service_id)
+        )
 
-    service = (
-        db.query(Service)
-        .filter(Service.id == service_id)
-        .first()
-    )
+    @staticmethod
+    def get_by_master(
+        db: Session,
+        master_id: int,
+    ) -> list[Service]:
+        return list(
+            db.scalars(
+                select(Service).where(
+                    Service.master_id == master_id
+                )
+            ).all()
+        )
 
-    db.close()
+    @staticmethod
+    def create(
+        db: Session,
+        service: Service,
+    ) -> Service:
+        db.add(service)
+        db.commit()
+        db.refresh(service)
+        return service
 
-    return service
+    @staticmethod
+    def update(
+        db: Session,
+        service: Service,
+    ) -> Service:
+        db.add(service)
+        db.commit()
+        db.refresh(service)
+        return service
 
-
-def get_services_by_master(master_id: int):
-
-    db = SessionLocal()
-
-    services = (
-        db.query(Service)
-        .filter(Service.master_id == master_id)
-        .all()
-    )
-
-    db.close()
-
-    return services
+    @staticmethod
+    def delete(
+        db: Session,
+        service: Service,
+    ) -> None:
+        db.delete(service)
+        db.commit()
