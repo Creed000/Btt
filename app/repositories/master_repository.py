@@ -1,28 +1,62 @@
-from app.database.session import SessionLocal
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.models.master import Master
 
 
-def get_master(master_id: int):
+class MasterRepository:
 
-    db = SessionLocal()
+    @staticmethod
+    def get_by_id(
+        db: Session,
+        master_id: int,
+    ) -> Master | None:
+        return db.scalar(
+            select(Master).where(Master.id == master_id)
+        )
 
-    master = (
-        db.query(Master)
-        .filter(Master.id == master_id)
-        .first()
-    )
+    @staticmethod
+    def get_all(
+        db: Session,
+    ) -> list[Master]:
+        return list(
+            db.scalars(
+                select(Master)
+            ).all()
+        )
 
-    db.close()
+    @staticmethod
+    def get_by_user_id(
+        db: Session,
+        user_id: int,
+    ) -> Master | None:
+        return db.scalar(
+            select(Master).where(Master.user_id == user_id)
+        )
 
-    return master
+    @staticmethod
+    def get_by_slug(
+        db: Session,
+        slug: str,
+    ) -> Master | None:
+        return db.scalar(
+            select(Master).where(Master.slug == slug)
+        )
 
+    @staticmethod
+    def update(
+        db: Session,
+        master: Master,
+    ) -> Master:
+        db.add(master)
+        db.commit()
+        db.refresh(master)
+        return master
 
-def get_all_masters():
-
-    db = SessionLocal()
-
-    masters = db.query(Master).all()
-
-    db.close()
-
-    return masters
+    @staticmethod
+    def delete(
+        db: Session,
+        master: Master,
+    ) -> None:
+        db.delete(master)
+        db.commit()
