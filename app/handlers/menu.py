@@ -22,11 +22,25 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "👤 Личный кабинет":
         await profile(update, context)
 
-    elif text == "❤️ Избранное":
+    elif text == "🔍 Найти мастера":
+        await booking(update, context)
+
+    elif text == "💼 Стать мастером":
         await update.message.reply_text(
-        "❤️ Пока здесь пусто."
+            "💼 Регистрация мастера появится в ближайшем обновлении.",
+            reply_markup=main_menu(),
         )
 
+    elif text == "ℹ️ Помощь":
+        await update.message.reply_text(
+            "ℹ️ Добро пожаловать в BTT!\n\n"
+            "📅 Записаться — запись к мастеру\n"
+            "🔍 Найти мастера — поиск по каталогу\n"
+            "👤 Личный кабинет — ваши записи\n"
+            "⚙️ Настройки — настройки аккаунта",
+            reply_markup=main_menu(),
+        )
+        
     elif text == "⚙️ Настройки":
         await update.message.reply_text(
             "⚙️ Настройки появятся в следующем обновлении."
