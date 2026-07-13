@@ -18,4 +18,7 @@ class Client(Base):
 
     total_visits: Mapped[int] = mapped_column(default=0)
 
-    user = relationship("User")
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="client",
+    )
