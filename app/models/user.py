@@ -30,12 +30,31 @@ class User(Base):
         default="ru",
     )
 
+    # Роль пользователя
+    # client | master | admin | owner
+    role: Mapped[str] = mapped_column(
+        String(20),
+        default="client",
+    )
+
+    # Часовой пояс
+    timezone: Mapped[str] = mapped_column(
+        String(50),
+        default="Europe/Moscow",
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    # Последняя активность
+    last_seen: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
     )
