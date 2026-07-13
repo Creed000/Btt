@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.repositories.client_repository import ClientRepository
+from app.services.client_service import ClientService
 
 
 class ClientService:
