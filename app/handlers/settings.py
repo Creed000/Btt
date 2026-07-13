@@ -14,12 +14,11 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "⚙️ Настройки\n\n"
-        "Выберите действие:\n\n"
         "🌐 Язык\n"
         "🔔 Уведомления\n"
         "🌙 Тема\n"
         "👤 Профиль\n\n"
-        "⚠️ Раздел находится в разработке."
+        "Функция находится в разработке."
     )
 
 
