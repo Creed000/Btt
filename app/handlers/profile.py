@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import ContextTypes, MessageHandler, filters
 
 from app.database.session import SessionLocal
 from app.repositories.user_repository import UserRepository
@@ -24,7 +24,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "👤 Личный кабинет\n\n"
             f"🆔 Telegram ID: {user.telegram_id}\n"
             f"👤 Имя: {user.first_name}\n"
-            f"📛 Фамилия: {user.last_name or '-'}\n"
+            f"👤 Фамилия: {user.last_name or '-'}\n"
             f"🌐 Username: @{user.username or '-'}"
         )
 
@@ -34,4 +34,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
 
 
-profile_handler = CommandHandler("profile", profile)
+profile_handler = MessageHandler(
+    filters.Regex(r"^👤 Личный кабинет$"),
+    profile,
+)
