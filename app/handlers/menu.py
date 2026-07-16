@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 
 from app.handlers.booking import booking
 from app.handlers.profile import profile
+from app.handlers.search import search
 
 from app.keyboards.category import category_menu
 from app.keyboards.master import master_menu
@@ -23,7 +24,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await profile(update, context)
 
     elif text == "🔍 Найти мастера":
-        await booking(update, context)
+        await search(update, context)
 
     elif text == "💼 Стать мастером":
         await update.message.reply_text(
