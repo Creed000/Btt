@@ -20,6 +20,7 @@ def master_panel_menu(master: Master) -> ReplyKeyboardMarkup:
         [KeyboardButton("📅 Мои записи")],
         [KeyboardButton("➕ Добавить услугу")],
         [KeyboardButton("📋 Мои услуги")],
+        [KeyboardButton("🏙 Мой город")],
         [KeyboardButton(booking_button)],
         [KeyboardButton("⬅️ Назад")],
     ]
@@ -86,7 +87,9 @@ async def become_master(
             db.refresh(master)
 
             await update.message.reply_text(
-                "🎉 Профиль мастера создан!",
+                "🎉 Профиль мастера создан!\n\n"
+                "Теперь нажмите «🏙 Мой город» и выберите город, "
+                "в котором принимаете клиентов.",
                 reply_markup=master_panel_menu(master),
             )
             return
@@ -97,10 +100,17 @@ async def become_master(
             )
         )
 
+        city_name = (
+            master.city.name
+            if master.city
+            else "не выбран"
+        )
+
         await update.message.reply_text(
             "💼 Кабинет мастера\n\n"
             f"🆔 ID мастера: {master.id}\n"
             f"⭐ Рейтинг: {master.rating:.1f}\n"
+            f"🏙 Город: {city_name}\n"
             f"📅 Приём записей: "
             f"{'включён' if master.booking_enabled else 'выключен'}\n"
             f"✅ Проверка профиля: "
