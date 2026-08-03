@@ -1,11 +1,30 @@
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 from app.database.session import SessionLocal
+from app.keyboards.main import main_menu
+from app.models.booking import Booking
+from app.models.master import Master
 from app.repositories.user_repository import UserRepository
 
 
-async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+STATUS_NAMES = {
+    "new": "🕓 Ожидает подтверждения",
+    "confirmed": "✅ Подтверждена",
+    "completed": "🏁 Завершена",
+    "cancelled": "❌ Отменена",
+}
+
+
+async def profile(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    if update.message is None:
+        return
+
     db = SessionLocal()
 
     try:
@@ -14,21 +33,87 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update.effective_user.id,
         )
 
-        if not user:
+        if user is None:
             await update.message.reply_text(
-                "❌ Вы еще не зарегистрированы.\nВведите /start."
+                "❌ Вы ещё не зарегистрированы. Отправьте /start.",
+                reply_markup=main_menu(),
             )
             return
 
-        text = (
-            "👤 Личный кабинет\n\n"
-            f"🆔 Telegram ID: {user.telegram_id}\n"
-            f"👤 Имя: {user.first_name}\n"
-            f"👤 Фамилия: {user.last_name or '-'}\n"
-            f"🌐 Username: @{user.username or '-'}"
+        bookings = list(
+            db.scalars(
+                select(Booking)
+                .options(
+                    joinedload(Booking.service),
+                    joinedload(Booking.master).joinedload(Master.user),
+                )
+                .where(Booking.client_id == user.id)
+                .order_by(
+                    Booking.booking_date.desc(),
+                    Booking.booking_time.desc(),
+                )
+                .limit(5)
+            ).unique().all()
         )
 
-        await update.message.reply_text(text)
+        profile_lines = [
+            "👤 Личный кабинет",
+            "",
+            f"🧑 Имя: {user.first_name}",
+            f"👤 Фамилия: {user.last_name or '—'}",
+            f"🌐 Username: @{user.username}" if user.username else "🌐 Username: —",
+            f"📱 Телефон: {user.phone or '—'}",
+            f"🎭 Роль: {user.role}",
+            f"🕒 Часовой пояс: {user.timezone}",
+            "",
+            "📅 Последние записи:",
+        ]
+
+        if not bookings:
+            profile_lines.append("Записей пока нет.")
+        else:
+            for booking_item in bookings:
+                service_title = (
+                    booking_item.service.title
+                    if booking_item.service
+                    else "Услуга"
+                )
+
+                master_name = "Мастер"
+                if (
+                    booking_item.master
+                    and booking_item.master.user
+                    and booking_item.master.user.first_name
+                ):
+                    master_name = booking_item.master.user.first_name
+
+                status_text = STATUS_NAMES.get(
+                    booking_item.status,
+                    booking_item.status,
+                )
+
+                profile_lines.extend(
+                    [
+                        "",
+                        f"№{booking_item.id}",
+                        f"💼 {service_title}",
+                        f"👤 Мастер: {master_name}",
+                        f"📅 {booking_item.booking_date.strftime('%d.%m.%Y')}",
+                        f"🕒 {booking_item.booking_time.strftime('%H:%M')}",
+                        f"Статус: {status_text}",
+                    ]
+                )
+
+        await update.message.reply_text(
+            "\n".join(profile_lines),
+            reply_markup=main_menu(),
+        )
+
+    except Exception:
+        await update.message.reply_text(
+            "❌ Не удалось загрузить личный кабинет. Попробуйте позже.",
+            reply_markup=main_menu(),
+        )
 
     finally:
         db.close()
