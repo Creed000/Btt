@@ -12,6 +12,10 @@ from app.handlers.settings import settings_handler
 application = (
     Application.builder()
     .token(settings.BOT_TOKEN)
+    .connect_timeout(30)
+    .read_timeout(30)
+    .write_timeout(30)
+    .pool_timeout(30)
     .build()
 )
 
