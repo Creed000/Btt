@@ -45,6 +45,7 @@ def master_actions_menu(
 
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton("📅 Мои записи")],
             [KeyboardButton("➕ Добавить услугу")],
             [KeyboardButton("📋 Мои услуги")],
             [KeyboardButton(booking_button)],
@@ -53,6 +54,43 @@ def master_actions_menu(
         resize_keyboard=True,
         one_time_keyboard=False,
         input_field_placeholder="Кабинет мастера",
+    )
+
+
+def services_list_menu(
+    services: list[Service],
+    booking_enabled: bool,
+) -> ReplyKeyboardMarkup:
+    keyboard: list[list[KeyboardButton]] = []
+
+    for service in services:
+        keyboard.append(
+            [
+                KeyboardButton(
+                    f"🗑 Удалить услугу #{service.id}"
+                )
+            ]
+        )
+
+    keyboard.extend(
+        [
+            [KeyboardButton("➕ Добавить услугу")],
+            [
+                KeyboardButton(
+                    "⛔ Выключить запись"
+                    if booking_enabled
+                    else "✅ Включить запись"
+                )
+            ],
+            [KeyboardButton("⬅️ Назад")],
+        ]
+    )
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Управление услугами",
     )
 
 
@@ -170,14 +208,79 @@ async def show_master_services(
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=master_actions_menu(
-                master.booking_enabled
+            reply_markup=services_list_menu(
+                services,
+                master.booking_enabled,
             ),
         )
 
     except Exception:
         await update.message.reply_text(
             "❌ Не удалось загрузить услуги. Попробуйте позже.",
+            reply_markup=main_menu(),
+        )
+
+    finally:
+        db.close()
+
+
+async def delete_master_service(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    service_id: int,
+) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    db = SessionLocal()
+
+    try:
+        master = get_current_master(
+            db,
+            update.effective_user.id,
+        )
+
+        if master is None:
+            await update.message.reply_text(
+                "❌ Профиль мастера не найден.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        service = db.scalar(
+            select(Service).where(
+                Service.id == service_id,
+                Service.master_id == master.id,
+            )
+        )
+
+        if service is None:
+            await update.message.reply_text(
+                "❌ Услуга не найдена или принадлежит другому мастеру.",
+                reply_markup=master_actions_menu(
+                    master.booking_enabled
+                ),
+            )
+            return
+
+        service_title = service.title
+
+        db.delete(service)
+        db.commit()
+
+        await update.message.reply_text(
+            f"✅ Услуга «{service_title}» удалена.",
+            reply_markup=master_actions_menu(
+                master.booking_enabled
+            ),
+        )
+
+    except Exception:
+        db.rollback()
+
+        await update.message.reply_text(
+            "❌ Не удалось удалить услугу. "
+            "Возможно, к ней уже привязаны записи.",
             reply_markup=main_menu(),
         )
 
