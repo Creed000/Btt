@@ -26,10 +26,11 @@ from app.keyboards.date import date_menu
 from app.keyboards.main import main_menu
 from app.keyboards.master import master_menu
 from app.keyboards.service import service_menu
-from app.keyboards.time import time_menu
+from app.keyboards.available_time import available_time_menu
 from app.models.booking import Booking
 from app.models.service import Service
 from app.models.user import User
+from app.services.availability import get_available_slots
 
 
 CITY_BUTTONS = {
@@ -416,24 +417,77 @@ async def menu(
         clear_booking_data(context)
         return
 
+    if text == "Ð¡Ð²Ð¾Ð±Ð¾Ð´Ð½Ð¾Ð³Ð¾ Ð²ÑÐµÐ¼ÐµÐ½Ð¸ Ð½ÐµÑ":
+        await update.message.reply_text(
+            "ÐÐ° Ð²ÑÐ±ÑÐ°Ð½Ð½ÑÑ Ð´Ð°ÑÑ ÑÐ²Ð¾Ð±Ð¾Ð´Ð½ÑÑ ÑÐ»Ð¾ÑÐ¾Ð² Ð½ÐµÑ. "
+            "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÑÑÐ³ÑÑ Ð´Ð°ÑÑ.",
+            reply_markup=date_menu(),
+        )
+        return
+
     if text in DATE_BUTTONS:
         selected_date = date.today() + timedelta(
             days=DATE_BUTTONS[text]
         )
+
+        master_id = context.user_data.get("master_id")
+        service_id = context.user_data.get("service_id")
+
+        if master_id is None or service_id is None:
+            clear_booking_data(context)
+
+            await update.message.reply_text(
+                "â ï¸ Ð¡Ð½Ð°ÑÐ°Ð»Ð° Ð²ÑÐ±ÐµÑÐ¸ÑÐµ Ð¼Ð°ÑÑÐµÑÐ° Ð¸ ÑÑÐ»ÑÐ³Ñ.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        db = SessionLocal()
+
+        try:
+            slots = get_available_slots(
+                db=db,
+                master_id=master_id,
+                service_id=service_id,
+                booking_date=selected_date,
+            )
+        except ValueError as error:
+            await update.message.reply_text(
+                f"â ï¸ {error}",
+                reply_markup=main_menu(),
+            )
+            clear_booking_data(context)
+            return
+        except Exception:
+            await update.message.reply_text(
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð³ÑÑÐ·Ð¸ÑÑ ÑÐ²Ð¾Ð±Ð¾Ð´Ð½Ð¾Ðµ Ð²ÑÐµÐ¼Ñ.",
+                reply_markup=main_menu(),
+            )
+            clear_booking_data(context)
+            return
+        finally:
+            db.close()
+
         context.user_data["booking_date"] = selected_date
 
         await update.message.reply_text(
             f"â ÐÐ°ÑÐ°: {selected_date.strftime('%d.%m.%Y')}\n\n"
-            "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð²ÑÐµÐ¼Ñ.",
-            reply_markup=time_menu(),
+            "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ²Ð¾Ð±Ð¾Ð´Ð½Ð¾Ðµ Ð²ÑÐµÐ¼Ñ.",
+            reply_markup=available_time_menu(slots),
         )
         return
 
-    if text in TIME_BUTTONS:
-        selected_time = datetime.strptime(
-            TIME_BUTTONS[text],
-            "%H:%M",
-        ).time()
+    if text.startswith("ð "):
+        try:
+            selected_time = datetime.strptime(
+                text.replace("ð ", "", 1),
+                "%H:%M",
+            ).time()
+        except ValueError:
+            await update.message.reply_text(
+                "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð²ÑÐµÐ¼Ñ. ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ»Ð¾Ñ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹."
+            )
+            return
 
         context.user_data["booking_time"] = selected_time
 
