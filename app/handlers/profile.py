@@ -1,10 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-from telegram import Update
+from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 from app.database.session import SessionLocal
-from app.keyboards.main import main_menu
 from app.models.booking import Booking
 from app.models.master import Master
 from app.repositories.user_repository import UserRepository
@@ -16,6 +15,29 @@ STATUS_NAMES = {
     "completed": "🏁 Завершена",
     "cancelled": "❌ Отменена",
 }
+
+
+def profile_menu(bookings: list[Booking]) -> ReplyKeyboardMarkup:
+    keyboard: list[list[KeyboardButton]] = []
+
+    for booking_item in bookings:
+        if booking_item.status in {"new", "confirmed"}:
+            keyboard.append(
+                [
+                    KeyboardButton(
+                        f"❌ Отменить запись #{booking_item.id}"
+                    )
+                ]
+            )
+
+    keyboard.append([KeyboardButton("⬅️ Назад")])
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Выберите действие",
+    )
 
 
 async def profile(
@@ -35,8 +57,7 @@ async def profile(
 
         if user is None:
             await update.message.reply_text(
-                "❌ Вы ещё не зарегистрированы. Отправьте /start.",
-                reply_markup=main_menu(),
+                "❌ Вы ещё не зарегистрированы. Отправьте /start."
             )
             return
 
@@ -52,7 +73,7 @@ async def profile(
                     Booking.booking_date.desc(),
                     Booking.booking_time.desc(),
                 )
-                .limit(5)
+                .limit(10)
             ).unique().all()
         )
 
@@ -61,7 +82,11 @@ async def profile(
             "",
             f"🧑 Имя: {user.first_name}",
             f"👤 Фамилия: {user.last_name or '—'}",
-            f"🌐 Username: @{user.username}" if user.username else "🌐 Username: —",
+            (
+                f"🌐 Username: @{user.username}"
+                if user.username
+                else "🌐 Username: —"
+            ),
             f"📱 Телефон: {user.phone or '—'}",
             f"🎭 Роль: {user.role}",
             f"🕒 Часовой пояс: {user.timezone}",
@@ -106,13 +131,12 @@ async def profile(
 
         await update.message.reply_text(
             "\n".join(profile_lines),
-            reply_markup=main_menu(),
+            reply_markup=profile_menu(bookings),
         )
 
     except Exception:
         await update.message.reply_text(
-            "❌ Не удалось загрузить личный кабинет. Попробуйте позже.",
-            reply_markup=main_menu(),
+            "❌ Не удалось загрузить личный кабинет. Попробуйте позже."
         )
 
     finally:
