@@ -41,12 +41,8 @@ async def begin_branch_creation(
     context.user_data["branch_creation"] = "name"
 
     await update.message.reply_text(
-        "🏬 Добавление филиала
-
-"
-        "Шаг 1 из 2. Введите название филиала.
-
-"
+        "🏬 Добавление филиала\n\n"
+        "Шаг 1 из 2. Введите название филиала.\n\n"
         "Например: Филиал в центре",
         reply_markup=branch_creation_menu(),
     )
@@ -86,9 +82,7 @@ async def process_branch_creation(
         context.user_data["branch_creation"] = "address"
 
         await update.message.reply_text(
-            "Шаг 2 из 2. Введите адрес филиала.
-
-"
+            "Шаг 2 из 2. Введите адрес филиала.\n\n"
             "Например: ул. Манаса, 45"
         )
         return True
@@ -183,13 +177,9 @@ async def process_branch_creation(
         clear_branch_creation(context)
 
         await update.message.reply_text(
-            "✅ Филиал успешно создан!
-
-"
-            f"ID: {branch_id}
-"
-            f"Название: {branch_name}
-"
+            "✅ Филиал успешно создан!\n\n"
+            f"ID: {branch_id}\n"
+            f"Название: {branch_name}\n"
             f"Адрес: {branch_address}",
             reply_markup=main_menu(role="owner"),
         )
