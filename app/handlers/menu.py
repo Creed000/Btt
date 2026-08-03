@@ -76,7 +76,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             "💇 Выберите мастера",
-            reply_markup=master_menu(db),
+            reply_markup=master_menu(),
         )
 
     elif text == "💅 Маникюр":
