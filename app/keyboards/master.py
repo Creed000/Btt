@@ -6,6 +6,7 @@ from app.repositories.master_repository import MasterRepository
 
 def master_menu() -> ReplyKeyboardMarkup:
     db = SessionLocal()
+
     try:
         masters = [
             master
@@ -16,7 +17,12 @@ def master_menu() -> ReplyKeyboardMarkup:
         keyboard: list[list[KeyboardButton]] = []
 
         for master in masters:
-            name = master.user.first_name or "Без имени"
+            name = (
+                master.user.first_name
+                if master.user and master.user.first_name
+                else "Без имени"
+            )
+
             keyboard.append(
                 [
                     KeyboardButton(
@@ -26,14 +32,19 @@ def master_menu() -> ReplyKeyboardMarkup:
             )
 
         if not keyboard:
-            keyboard.append([KeyboardButton("Мастеров пока нет")])
+            keyboard.append(
+                [KeyboardButton("Мастеров пока нет")]
+            )
 
-        keyboard.append([KeyboardButton("⬅️ Назад")])
+        keyboard.append(
+            [KeyboardButton("⬅️ Назад")]
+        )
 
         return ReplyKeyboardMarkup(
             keyboard,
             resize_keyboard=True,
             one_time_keyboard=False,
         )
+
     finally:
         db.close()
