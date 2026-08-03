@@ -25,6 +25,11 @@ def main_menu(
         ],
     ]
 
+    if role != "owner":
+        keyboard.append(
+            [KeyboardButton("🏢 Создать салон")]
+        )
+
     if role in ADMIN_ROLES:
         keyboard.append(
             [KeyboardButton("👑 Админ-панель")]
