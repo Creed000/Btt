@@ -16,6 +16,7 @@ def salon_owner_menu() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton("🏢 Мой салон")],
             [KeyboardButton("🏬 Мои филиалы")],
+            [KeyboardButton("➕ Добавить филиал")],
             [KeyboardButton("💳 Тариф и подписка")],
             [KeyboardButton("⬅️ Назад")],
         ],
