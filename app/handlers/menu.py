@@ -8,6 +8,10 @@ from app.database.bookings import create_booking
 from app.database.session import SessionLocal
 from app.handlers.booking import booking
 from app.handlers.master_panel import become_master
+from app.handlers.master_bookings import (
+    change_master_booking_status,
+    show_master_bookings,
+)
 from app.handlers.profile import profile
 from app.handlers.search import search
 from app.handlers.service_manager import (
@@ -28,33 +32,33 @@ from app.models.user import User
 
 
 CITY_BUTTONS = {
-    "🏙 Бишкек": "Бишкек",
-    "🏙 Ош": "Ош",
-    "🏙 Джалал-Абад": "Джалал-Абад",
+    "ð ÐÐ¸ÑÐºÐµÐº": "ÐÐ¸ÑÐºÐµÐº",
+    "ð ÐÑ": "ÐÑ",
+    "ð ÐÐ¶Ð°Ð»Ð°Ð»-ÐÐ±Ð°Ð´": "ÐÐ¶Ð°Ð»Ð°Ð»-ÐÐ±Ð°Ð´",
 }
 
 CATEGORY_BUTTONS = {
-    "💇 Волосы": "hair",
-    "💅 Маникюр": "nails",
-    "👁 Ресницы": "lashes",
-    "💆 Массаж": "massage",
+    "ð ÐÐ¾Ð»Ð¾ÑÑ": "hair",
+    "ð ÐÐ°Ð½Ð¸ÐºÑÑ": "nails",
+    "ð Ð ÐµÑÐ½Ð¸ÑÑ": "lashes",
+    "ð ÐÐ°ÑÑÐ°Ð¶": "massage",
 }
 
 DATE_BUTTONS = {
-    "📅 Сегодня": 0,
-    "📅 Завтра": 1,
-    "📅 Послезавтра": 2,
+    "ð Ð¡ÐµÐ³Ð¾Ð´Ð½Ñ": 0,
+    "ð ÐÐ°Ð²ÑÑÐ°": 1,
+    "ð ÐÐ¾ÑÐ»ÐµÐ·Ð°Ð²ÑÑÐ°": 2,
 }
 
 TIME_BUTTONS = {
-    "🕘 09:00": "09:00",
-    "🕙 10:00": "10:00",
-    "🕚 11:00": "11:00",
-    "🕛 12:00": "12:00",
-    "🕐 13:00": "13:00",
-    "🕑 14:00": "14:00",
-    "🕒 15:00": "15:00",
-    "🕓 16:00": "16:00",
+    "ð 09:00": "09:00",
+    "ð 10:00": "10:00",
+    "ð 11:00": "11:00",
+    "ð 12:00": "12:00",
+    "ð 13:00": "13:00",
+    "ð 14:00": "14:00",
+    "ð 15:00": "15:00",
+    "ð 16:00": "16:00",
 }
 
 
@@ -87,7 +91,7 @@ async def cancel_client_booking(
 
         if user is None:
             await update.message.reply_text(
-                "❌ Пользователь не найден. Отправьте /start.",
+                "â ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½. ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ /start.",
                 reply_markup=main_menu(),
             )
             return
@@ -101,21 +105,21 @@ async def cancel_client_booking(
 
         if booking_item is None:
             await update.message.reply_text(
-                "❌ Запись не найдена или принадлежит другому пользователю.",
+                "â ÐÐ°Ð¿Ð¸ÑÑ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð° Ð¸Ð»Ð¸ Ð¿ÑÐ¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ Ð´ÑÑÐ³Ð¾Ð¼Ñ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ.",
                 reply_markup=main_menu(),
             )
             return
 
         if booking_item.status == "cancelled":
             await update.message.reply_text(
-                "ℹ️ Эта запись уже отменена.",
+                "â¹ï¸ Ð­ÑÐ° Ð·Ð°Ð¿Ð¸ÑÑ ÑÐ¶Ðµ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.",
                 reply_markup=main_menu(),
             )
             return
 
         if booking_item.status == "completed":
             await update.message.reply_text(
-                "❌ Завершённую запись отменить нельзя.",
+                "â ÐÐ°Ð²ÐµÑÑÑÐ½Ð½ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½Ð¸ÑÑ Ð½ÐµÐ»ÑÐ·Ñ.",
                 reply_markup=main_menu(),
             )
             return
@@ -124,7 +128,7 @@ async def cancel_client_booking(
         db.commit()
 
         await update.message.reply_text(
-            f"✅ Запись #{booking_id} отменена.",
+            f"â ÐÐ°Ð¿Ð¸ÑÑ #{booking_id} Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.",
             reply_markup=main_menu(),
         )
 
@@ -132,7 +136,7 @@ async def cancel_client_booking(
         db.rollback()
 
         await update.message.reply_text(
-            "❌ Не удалось отменить запись. Попробуйте позже.",
+            "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¼ÐµÐ½Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ. ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ Ð¿Ð¾Ð·Ð¶Ðµ.",
             reply_markup=main_menu(),
         )
 
@@ -149,22 +153,77 @@ async def menu(
 
     text = update.message.text.strip()
 
-    # Продолжаем незавершённое добавление услуги.
+    # ÐÑÐ¾Ð´Ð¾Ð»Ð¶Ð°ÐµÐ¼ Ð½ÐµÐ·Ð°Ð²ÐµÑÑÑÐ½Ð½Ð¾Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ ÑÑÐ»ÑÐ³Ð¸.
     if context.user_data.get("service_creation"):
         handled = await process_service_creation(update, context)
         if handled:
             return
 
-    # Кабинет мастера.
-    if text == "➕ Добавить услугу":
+    # ÐÐ°Ð±Ð¸Ð½ÐµÑ Ð¼Ð°ÑÑÐµÑÐ°.
+    if text == "ð ÐÐ¾Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸":
+        await show_master_bookings(update, context)
+        return
+
+    if text.startswith("â ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ #"):
+        try:
+            booking_id = int(text.rsplit("#", 1)[1])
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð½Ð¾Ð¼ÐµÑ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        await change_master_booking_status(
+            update,
+            booking_id,
+            new_status="confirmed",
+        )
+        return
+
+    if text.startswith("ð ÐÐ°Ð²ÐµÑÑÐ¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ #"):
+        try:
+            booking_id = int(text.rsplit("#", 1)[1])
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð½Ð¾Ð¼ÐµÑ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        await change_master_booking_status(
+            update,
+            booking_id,
+            new_status="completed",
+        )
+        return
+
+    if text.startswith("â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ Ð·Ð°ÑÐ²ÐºÑ #"):
+        try:
+            booking_id = int(text.rsplit("#", 1)[1])
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð½Ð¾Ð¼ÐµÑ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        await change_master_booking_status(
+            update,
+            booking_id,
+            new_status="cancelled",
+        )
+        return
+
+    if text == "â ÐÐ¾Ð±Ð°Ð²Ð¸ÑÑ ÑÑÐ»ÑÐ³Ñ":
         await begin_add_service(update, context)
         return
 
-    if text == "📋 Мои услуги":
+    if text == "ð ÐÐ¾Ð¸ ÑÑÐ»ÑÐ³Ð¸":
         await show_master_services(update, context)
         return
 
-    if text == "⛔ Выключить запись":
+    if text == "â ÐÑÐºÐ»ÑÑÐ¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ":
         await toggle_master_booking(
             update,
             context,
@@ -172,7 +231,7 @@ async def menu(
         )
         return
 
-    if text == "✅ Включить запись":
+    if text == "â ÐÐºÐ»ÑÑÐ¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ":
         await toggle_master_booking(
             update,
             context,
@@ -180,13 +239,13 @@ async def menu(
         )
         return
 
-    # Отмена клиентской записи.
-    if text.startswith("❌ Отменить запись #"):
+    # ÐÑÐ¼ÐµÐ½Ð° ÐºÐ»Ð¸ÐµÐ½ÑÑÐºÐ¾Ð¹ Ð·Ð°Ð¿Ð¸ÑÐ¸.
+    if text.startswith("â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ #"):
         try:
             booking_id = int(text.rsplit("#", 1)[1])
         except (ValueError, IndexError):
             await update.message.reply_text(
-                "❌ Не удалось определить номер записи.",
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð½Ð¾Ð¼ÐµÑ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
                 reply_markup=main_menu(),
             )
             return
@@ -194,50 +253,50 @@ async def menu(
         await cancel_client_booking(update, booking_id)
         return
 
-    # Главное меню.
-    if text == "📅 Записаться":
+    # ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ.
+    if text == "ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ":
         clear_booking_data(context)
         await booking(update, context)
         return
 
-    if text == "👤 Личный кабинет":
+    if text == "ð¤ ÐÐ¸ÑÐ½ÑÐ¹ ÐºÐ°Ð±Ð¸Ð½ÐµÑ":
         await profile(update, context)
         return
 
-    if text == "🔍 Найти мастера":
+    if text == "ð ÐÐ°Ð¹ÑÐ¸ Ð¼Ð°ÑÑÐµÑÐ°":
         await search(update, context)
         return
 
-    if text == "💼 Стать мастером":
+    if text == "ð¼ Ð¡ÑÐ°ÑÑ Ð¼Ð°ÑÑÐµÑÐ¾Ð¼":
         await become_master(update, context)
         return
 
-    if text == "ℹ️ Помощь":
+    if text == "â¹ï¸ ÐÐ¾Ð¼Ð¾ÑÑ":
         await update.message.reply_text(
-            "ℹ️ Добро пожаловать в BTT!\n\n"
-            "📅 Записаться — запись к мастеру\n"
-            "🔍 Найти мастера — поиск по каталогу\n"
-            "👤 Личный кабинет — ваши записи\n"
-            "💼 Стать мастером — кабинет мастера\n"
-            "⚙️ Настройки — настройки аккаунта",
+            "â¹ï¸ ÐÐ¾Ð±ÑÐ¾ Ð¿Ð¾Ð¶Ð°Ð»Ð¾Ð²Ð°ÑÑ Ð² BTT!\n\n"
+            "ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ â Ð·Ð°Ð¿Ð¸ÑÑ Ðº Ð¼Ð°ÑÑÐµÑÑ\n"
+            "ð ÐÐ°Ð¹ÑÐ¸ Ð¼Ð°ÑÑÐµÑÐ° â Ð¿Ð¾Ð¸ÑÐº Ð¿Ð¾ ÐºÐ°ÑÐ°Ð»Ð¾Ð³Ñ\n"
+            "ð¤ ÐÐ¸ÑÐ½ÑÐ¹ ÐºÐ°Ð±Ð¸Ð½ÐµÑ â Ð²Ð°ÑÐ¸ Ð·Ð°Ð¿Ð¸ÑÐ¸\n"
+            "ð¼ Ð¡ÑÐ°ÑÑ Ð¼Ð°ÑÑÐµÑÐ¾Ð¼ â ÐºÐ°Ð±Ð¸Ð½ÐµÑ Ð¼Ð°ÑÑÐµÑÐ°\n"
+            "âï¸ ÐÐ°ÑÑÑÐ¾Ð¹ÐºÐ¸ â Ð½Ð°ÑÑÑÐ¾Ð¹ÐºÐ¸ Ð°ÐºÐºÐ°ÑÐ½ÑÐ°",
             reply_markup=main_menu(),
         )
         return
 
-    if text == "⚙️ Настройки":
+    if text == "âï¸ ÐÐ°ÑÑÑÐ¾Ð¹ÐºÐ¸":
         await update.message.reply_text(
-            "⚙️ Настройки появятся в следующем этапе.",
+            "âï¸ ÐÐ°ÑÑÑÐ¾Ð¹ÐºÐ¸ Ð¿Ð¾ÑÐ²ÑÑÑÑ Ð² ÑÐ»ÐµÐ´ÑÑÑÐµÐ¼ ÑÑÐ°Ð¿Ðµ.",
             reply_markup=main_menu(),
         )
         return
 
-    # Создание записи клиента.
+    # Ð¡Ð¾Ð·Ð´Ð°Ð½Ð¸Ðµ Ð·Ð°Ð¿Ð¸ÑÐ¸ ÐºÐ»Ð¸ÐµÐ½ÑÐ°.
     if text in CITY_BUTTONS:
         context.user_data["city"] = CITY_BUTTONS[text]
 
         await update.message.reply_text(
-            f"✅ Город: {CITY_BUTTONS[text]}\n\n"
-            "📂 Теперь выберите категорию.",
+            f"â ÐÐ¾ÑÐ¾Ð´: {CITY_BUTTONS[text]}\n\n"
+            "ð Ð¢ÐµÐ¿ÐµÑÑ Ð²ÑÐ±ÐµÑÐ¸ÑÐµ ÐºÐ°ÑÐµÐ³Ð¾ÑÐ¸Ñ.",
             reply_markup=category_menu(),
         )
         return
@@ -246,22 +305,22 @@ async def menu(
         context.user_data["category"] = CATEGORY_BUTTONS[text]
 
         await update.message.reply_text(
-            "👤 Выберите мастера.",
+            "ð¤ ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¼Ð°ÑÑÐµÑÐ°.",
             reply_markup=master_menu(),
         )
         return
 
-    if text.startswith("👤") and "#" in text:
+    if text.startswith("ð¤") and "#" in text:
         try:
             master_id = int(text.split("#", 1)[1].split()[0])
             master_name = (
-                text.split("·", 1)[0]
-                .replace("👤", "")
+                text.split("Â·", 1)[0]
+                .replace("ð¤", "")
                 .strip()
             )
         except (ValueError, IndexError):
             await update.message.reply_text(
-                "Не удалось определить мастера. Выберите мастера кнопкой."
+                "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ Ð¼Ð°ÑÑÐµÑÐ°. ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¼Ð°ÑÑÐµÑÐ° ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹."
             )
             return
 
@@ -278,7 +337,7 @@ async def menu(
 
         if service is None:
             await update.message.reply_text(
-                "У этого мастера пока нет добавленных услуг.",
+                "Ð£ ÑÑÐ¾Ð³Ð¾ Ð¼Ð°ÑÑÐµÑÐ° Ð¿Ð¾ÐºÐ° Ð½ÐµÑ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð½ÑÑ ÑÑÐ»ÑÐ³.",
                 reply_markup=main_menu(),
             )
             clear_booking_data(context)
@@ -290,9 +349,9 @@ async def menu(
         context.user_data["service_title"] = service.title
 
         await update.message.reply_text(
-            f"✅ Мастер: {master_name}\n"
-            f"💼 Услуга: {service.title}\n\n"
-            "📅 Выберите дату.",
+            f"â ÐÐ°ÑÑÐµÑ: {master_name}\n"
+            f"ð¼ Ð£ÑÐ»ÑÐ³Ð°: {service.title}\n\n"
+            "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´Ð°ÑÑ.",
             reply_markup=date_menu(),
         )
         return
@@ -304,8 +363,8 @@ async def menu(
         context.user_data["booking_date"] = selected_date
 
         await update.message.reply_text(
-            f"✅ Дата: {selected_date.strftime('%d.%m.%Y')}\n\n"
-            "🕒 Выберите время.",
+            f"â ÐÐ°ÑÐ°: {selected_date.strftime('%d.%m.%Y')}\n\n"
+            "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð²ÑÐµÐ¼Ñ.",
             reply_markup=time_menu(),
         )
         return
@@ -322,23 +381,23 @@ async def menu(
         date_text = (
             booking_date.strftime("%d.%m.%Y")
             if booking_date
-            else "—"
+            else "â"
         )
 
         await update.message.reply_text(
-            "📋 Подтверждение записи\n\n"
-            f"🏙 Город: {context.user_data.get('city', '—')}\n"
-            f"📂 Категория: {context.user_data.get('category', '—')}\n"
-            f"👤 Мастер: {context.user_data.get('master_name', '—')}\n"
-            f"💼 Услуга: {context.user_data.get('service_title', '—')}\n"
-            f"📅 Дата: {date_text}\n"
-            f"🕒 Время: {selected_time.strftime('%H:%M')}\n\n"
-            "Подтвердить запись?",
+            "ð ÐÐ¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÐµÐ½Ð¸Ðµ Ð·Ð°Ð¿Ð¸ÑÐ¸\n\n"
+            f"ð ÐÐ¾ÑÐ¾Ð´: {context.user_data.get('city', 'â')}\n"
+            f"ð ÐÐ°ÑÐµÐ³Ð¾ÑÐ¸Ñ: {context.user_data.get('category', 'â')}\n"
+            f"ð¤ ÐÐ°ÑÑÐµÑ: {context.user_data.get('master_name', 'â')}\n"
+            f"ð¼ Ð£ÑÐ»ÑÐ³Ð°: {context.user_data.get('service_title', 'â')}\n"
+            f"ð ÐÐ°ÑÐ°: {date_text}\n"
+            f"ð ÐÑÐµÐ¼Ñ: {selected_time.strftime('%H:%M')}\n\n"
+            "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ?",
             reply_markup=confirm_menu(),
         )
         return
 
-    if text == "✅ Подтвердить":
+    if text == "â ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ":
         required_fields = (
             "master_id",
             "service_id",
@@ -353,7 +412,7 @@ async def menu(
             clear_booking_data(context)
 
             await update.message.reply_text(
-                "⚠️ Данные записи заполнены не полностью. Начните заново.",
+                "â ï¸ ÐÐ°Ð½Ð½ÑÐµ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð·Ð°Ð¿Ð¾Ð»Ð½ÐµÐ½Ñ Ð½Ðµ Ð¿Ð¾Ð»Ð½Ð¾ÑÑÑÑ. ÐÐ°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð½Ð¾Ð²Ð¾.",
                 reply_markup=main_menu(),
             )
             return
@@ -370,7 +429,7 @@ async def menu(
             clear_booking_data(context)
 
             await update.message.reply_text(
-                f"⚠️ {error}",
+                f"â ï¸ {error}",
                 reply_markup=main_menu(),
             )
             return
@@ -378,7 +437,7 @@ async def menu(
             clear_booking_data(context)
 
             await update.message.reply_text(
-                "❌ Не удалось создать запись. Попробуйте ещё раз.",
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ¾Ð·Ð´Ð°ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ. ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ ÐµÑÑ ÑÐ°Ð·.",
                 reply_markup=main_menu(),
             )
             return
@@ -386,39 +445,39 @@ async def menu(
         clear_booking_data(context)
 
         await update.message.reply_text(
-            "🎉 Запись успешно создана!\n\n"
-            f"Номер записи: {created_booking.id}",
+            "ð ÐÐ°Ð¿Ð¸ÑÑ ÑÑÐ¿ÐµÑÐ½Ð¾ ÑÐ¾Ð·Ð´Ð°Ð½Ð°!\n\n"
+            f"ÐÐ¾Ð¼ÐµÑ Ð·Ð°Ð¿Ð¸ÑÐ¸: {created_booking.id}",
             reply_markup=main_menu(),
         )
         return
 
-    if text == "❌ Отменить":
+    if text == "â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ":
         clear_booking_data(context)
 
         await update.message.reply_text(
-            "❌ Создание записи отменено.",
+            "â Ð¡Ð¾Ð·Ð´Ð°Ð½Ð¸Ðµ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð¾.",
             reply_markup=main_menu(),
         )
         return
 
-    if text == "⬅️ Назад":
+    if text == "â¬ï¸ ÐÐ°Ð·Ð°Ð´":
         clear_booking_data(context)
 
         await update.message.reply_text(
-            "🏠 Главное меню",
+            "ð  ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ",
             reply_markup=main_menu(),
         )
         return
 
-    if text == "Мастеров пока нет":
+    if text == "ÐÐ°ÑÑÐµÑÐ¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ":
         await update.message.reply_text(
-            "В системе пока нет доступных мастеров.",
+            "Ð ÑÐ¸ÑÑÐµÐ¼Ðµ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð½ÑÑ Ð¼Ð°ÑÑÐµÑÐ¾Ð².",
             reply_markup=main_menu(),
         )
         return
 
     await update.message.reply_text(
-        "Пожалуйста, используйте кнопки меню.",
+        "ÐÐ¾Ð¶Ð°Ð»ÑÐ¹ÑÑÐ°, Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ ÐºÐ½Ð¾Ð¿ÐºÐ¸ Ð¼ÐµÐ½Ñ.",
         reply_markup=main_menu(),
     )
 
