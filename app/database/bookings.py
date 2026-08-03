@@ -1,9 +1,11 @@
-from datetime import date, time
+from datetime import date, datetime, time
 
 from sqlalchemy import select
 
 from app.database.session import SessionLocal
 from app.models.booking import Booking
+from app.models.master import Master
+from app.models.service import Service
 from app.models.user import User
 
 
@@ -18,10 +20,54 @@ def create_booking(
 
     try:
         user = db.scalar(
-            select(User).where(User.telegram_id == telegram_id)
+            select(User).where(
+                User.telegram_id == telegram_id
+            )
         )
+
         if user is None:
-            raise ValueError("Пользователь не зарегистрирован. Отправьте /start.")
+            raise ValueError(
+                "Пользователь не зарегистрирован. Отправьте /start."
+            )
+
+        if not user.is_active:
+            raise ValueError(
+                "Ваш аккаунт временно отключён."
+            )
+
+        master = db.scalar(
+            select(Master).where(
+                Master.id == master_id,
+                Master.booking_enabled.is_(True),
+            )
+        )
+
+        if master is None:
+            raise ValueError(
+                "Мастер не найден или временно не принимает записи."
+            )
+
+        service = db.scalar(
+            select(Service).where(
+                Service.id == service_id,
+                Service.master_id == master_id,
+            )
+        )
+
+        if service is None:
+            raise ValueError(
+                "Услуга не найдена или не принадлежит выбранному мастеру."
+            )
+
+        selected_datetime = datetime.combine(
+            booking_date,
+            booking_time,
+        )
+
+        if selected_datetime <= datetime.now():
+            raise ValueError(
+                "Нельзя записаться на прошедшую дату или время."
+            )
 
         busy_booking = db.scalar(
             select(Booking).where(
@@ -31,8 +77,11 @@ def create_booking(
                 Booking.status.in_(["new", "confirmed"]),
             )
         )
+
         if busy_booking is not None:
-            raise ValueError("Это время уже занято. Выберите другой слот.")
+            raise ValueError(
+                "Это время уже занято. Выберите другой слот."
+            )
 
         booking = Booking(
             client_id=user.id,
@@ -46,10 +95,12 @@ def create_booking(
         db.add(booking)
         db.commit()
         db.refresh(booking)
+
         return booking
 
     except Exception:
         db.rollback()
         raise
+
     finally:
         db.close()
