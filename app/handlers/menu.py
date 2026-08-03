@@ -15,7 +15,9 @@ from app.keyboards.date import date_menu
 from app.keyboards.main import main_menu
 from app.keyboards.master import master_menu
 from app.keyboards.time import time_menu
+from app.models.booking import Booking
 from app.models.service import Service
+from app.models.user import User
 
 
 CITY_BUTTONS = {
@@ -63,11 +65,95 @@ def clear_booking_data(context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data.pop(key, None)
 
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cancel_client_booking(
+    update: Update,
+    booking_id: int,
+) -> None:
+    db = SessionLocal()
+
+    try:
+        user = db.scalar(
+            select(User).where(
+                User.telegram_id == update.effective_user.id
+            )
+        )
+
+        if user is None:
+            await update.message.reply_text(
+                "❌ Пользователь не найден. Отправьте /start.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        booking_item = db.scalar(
+            select(Booking).where(
+                Booking.id == booking_id,
+                Booking.client_id == user.id,
+            )
+        )
+
+        if booking_item is None:
+            await update.message.reply_text(
+                "❌ Запись не найдена или принадлежит другому пользователю.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        if booking_item.status == "cancelled":
+            await update.message.reply_text(
+                "ℹ️ Эта запись уже отменена.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        if booking_item.status == "completed":
+            await update.message.reply_text(
+                "❌ Завершённую запись отменить нельзя.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        booking_item.status = "cancelled"
+        db.commit()
+
+        await update.message.reply_text(
+            f"✅ Запись #{booking_id} отменена.",
+            reply_markup=main_menu(),
+        )
+
+    except Exception:
+        db.rollback()
+
+        await update.message.reply_text(
+            "❌ Не удалось отменить запись. Попробуйте позже.",
+            reply_markup=main_menu(),
+        )
+
+    finally:
+        db.close()
+
+
+async def menu(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
     if update.message is None or update.message.text is None:
         return
 
     text = update.message.text.strip()
+
+    if text.startswith("❌ Отменить запись #"):
+        try:
+            booking_id = int(text.rsplit("#", 1)[1])
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "❌ Не удалось определить номер записи.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        await cancel_client_booking(update, booking_id)
+        return
 
     if text == "📅 Записаться":
         clear_booking_data(context)
@@ -142,6 +228,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
 
         db = SessionLocal()
+
         try:
             service = db.scalar(
                 select(Service)
@@ -173,7 +260,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if text in DATE_BUTTONS:
-        selected_date = date.today() + timedelta(days=DATE_BUTTONS[text])
+        selected_date = date.today() + timedelta(
+            days=DATE_BUTTONS[text]
+        )
         context.user_data["booking_date"] = selected_date
 
         await update.message.reply_text(
@@ -191,14 +280,20 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         context.user_data["booking_time"] = selected_time
 
+        booking_date = context.user_data.get("booking_date")
+        date_text = (
+            booking_date.strftime("%d.%m.%Y")
+            if booking_date
+            else "—"
+        )
+
         await update.message.reply_text(
             "📋 Подтверждение записи\n\n"
             f"🏙 Город: {context.user_data.get('city', '—')}\n"
             f"📂 Категория: {context.user_data.get('category', '—')}\n"
             f"👤 Мастер: {context.user_data.get('master_name', '—')}\n"
             f"💼 Услуга: {context.user_data.get('service_title', '—')}\n"
-            f"📅 Дата: "
-            f"{context.user_data.get('booking_date').strftime('%d.%m.%Y') if context.user_data.get('booking_date') else '—'}\n"
+            f"📅 Дата: {date_text}\n"
             f"🕒 Время: {selected_time.strftime('%H:%M')}\n\n"
             "Подтвердить запись?",
             reply_markup=confirm_menu(),
@@ -213,8 +308,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "booking_time",
         )
 
-        if not all(context.user_data.get(field) for field in required_fields):
+        if not all(
+            context.user_data.get(field)
+            for field in required_fields
+        ):
             clear_booking_data(context)
+
             await update.message.reply_text(
                 "⚠️ Данные записи заполнены не полностью. Начните заново.",
                 reply_markup=main_menu(),
@@ -230,18 +329,20 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 booking_time=context.user_data["booking_time"],
             )
         except ValueError as error:
+            clear_booking_data(context)
+
             await update.message.reply_text(
                 f"⚠️ {error}",
                 reply_markup=main_menu(),
             )
-            clear_booking_data(context)
             return
         except Exception:
+            clear_booking_data(context)
+
             await update.message.reply_text(
                 "❌ Не удалось создать запись. Попробуйте ещё раз.",
                 reply_markup=main_menu(),
             )
-            clear_booking_data(context)
             return
 
         clear_booking_data(context)
@@ -257,7 +358,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         clear_booking_data(context)
 
         await update.message.reply_text(
-            "❌ Запись отменена.",
+            "❌ Создание записи отменено.",
             reply_markup=main_menu(),
         )
         return
