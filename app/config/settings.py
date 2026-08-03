@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     DEBUG: bool = True
 
+    # Telegram ID владельца SaaS.
+    # Добавляется в Railway Variables.
+    ADMIN_TELEGRAM_ID: int | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
