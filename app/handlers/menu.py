@@ -274,5 +274,3 @@ menu_handler = MessageHandler(
     filters.TEXT & ~filters.COMMAND,
     menu,
 )
-
-)
