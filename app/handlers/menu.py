@@ -1,5 +1,4 @@
-import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from telegram import Update
@@ -19,68 +18,49 @@ from app.keyboards.time import time_menu
 from app.models.service import Service
 
 
-CATEGORY_LABELS = {
-    "hair": "Волосы",
-    "nails": "Маникюр",
-    "lashes": "Ресницы",
-    "massage": "Массаж",
+CITY_BUTTONS = {
+    "🏙 Бишкек": "Бишкек",
+    "🏙 Ош": "Ош",
+    "🏙 Джалал-Абад": "Джалал-Абад",
 }
 
-DATE_OFFSETS = {
+CATEGORY_BUTTONS = {
+    "💇 Волосы": "hair",
+    "💅 Маникюр": "nails",
+    "👁 Ресницы": "lashes",
+    "💆 Массаж": "massage",
+}
+
+DATE_BUTTONS = {
     "📅 Сегодня": 0,
     "📅 Завтра": 1,
     "📅 Послезавтра": 2,
 }
 
 TIME_BUTTONS = {
-    "🕘 09:00",
-    "🕙 10:00",
-    "🕚 11:00",
-    "🕛 12:00",
-    "🕐 13:00",
-    "🕑 14:00",
-    "🕒 15:00",
-    "🕓 16:00",
-    "🕔 17:00",
-    "🕕 18:00",
+    "🕘 09:00": "09:00",
+    "🕙 10:00": "10:00",
+    "🕚 11:00": "11:00",
+    "🕛 12:00": "12:00",
+    "🕐 13:00": "13:00",
+    "🕑 14:00": "14:00",
+    "🕒 15:00": "15:00",
+    "🕓 16:00": "16:00",
 }
 
 
-def _get_first_service_id(master_id: int) -> int | None:
-    db = SessionLocal()
-    try:
-        service = db.scalar(
-            select(Service)
-            .where(Service.master_id == master_id)
-            .order_by(Service.id)
-        )
-        return service.id if service else None
-    finally:
-        db.close()
-
-
-def _format_summary(context: ContextTypes.DEFAULT_TYPE) -> str:
-    category = CATEGORY_LABELS.get(
-        context.user_data.get("category", ""),
-        context.user_data.get("category", "—"),
-    )
-
-    booking_date = context.user_data.get("booking_date")
-    date_text = (
-        booking_date.strftime("%d.%m.%Y")
-        if booking_date
-        else "—"
-    )
-
-    return (
-        "📋 Подтверждение записи\n\n"
-        f"🏙 Город: {context.user_data.get('city', '—')}\n"
-        f"📂 Категория: {category}\n"
-        f"👤 Мастер: {context.user_data.get('master_name', '—')}\n"
-        f"📅 Дата: {date_text}\n"
-        f"🕒 Время: {context.user_data.get('time_text', '—')}\n\n"
-        "Подтвердить запись?"
-    )
+def clear_booking_data(context: ContextTypes.DEFAULT_TYPE) -> None:
+    for key in (
+        "city",
+        "category",
+        "master_id",
+        "master_name",
+        "service_id",
+        "service_title",
+        "booking_date",
+        "booking_time",
+    ):
+        context.user_data.pop(key, None)
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -90,184 +70,218 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text.strip()
 
     if text == "📅 Записаться":
-        context.user_data.clear()
+        clear_booking_data(context)
         await booking(update, context)
+        return
 
-    elif text == "👤 Личный кабинет":
+    if text == "👤 Личный кабинет":
         await profile(update, context)
+        return
 
-    elif text == "🔍 Найти мастера":
+    if text == "🔍 Найти мастера":
         await search(update, context)
+        return
 
-    elif text == "💼 Стать мастером":
+    if text == "💼 Стать мастером":
         await update.message.reply_text(
-            "💼 Регистрацию мастера подключим следующим этапом.",
+            "💼 Регистрация мастера появится в следующем этапе.",
             reply_markup=main_menu(),
         )
+        return
 
-    elif text == "ℹ️ Помощь":
+    if text == "ℹ️ Помощь":
         await update.message.reply_text(
             "ℹ️ Добро пожаловать в BTT!\n\n"
             "📅 Записаться — запись к мастеру\n"
             "🔍 Найти мастера — поиск по каталогу\n"
             "👤 Личный кабинет — ваши записи\n"
+            "💼 Стать мастером — регистрация мастера\n"
             "⚙️ Настройки — настройки аккаунта",
             reply_markup=main_menu(),
         )
+        return
 
-    elif text == "⚙️ Настройки":
+    if text == "⚙️ Настройки":
         await update.message.reply_text(
-            "⚙️ Настройки подключим следующим этапом.",
+            "⚙️ Настройки появятся в следующем этапе.",
             reply_markup=main_menu(),
         )
+        return
 
-    elif text in {"🏙 Бишкек", "🏙 Ош", "🏙 Джалал-Абад"}:
-        context.user_data["city"] = text.replace("🏙", "").strip()
+    if text in CITY_BUTTONS:
+        context.user_data["city"] = CITY_BUTTONS[text]
+
         await update.message.reply_text(
-            "✅ Город выбран. Теперь выберите категорию.",
+            f"✅ Город: {CITY_BUTTONS[text]}\n\n"
+            "📂 Теперь выберите категорию.",
             reply_markup=category_menu(),
         )
+        return
 
-    elif text in {"💇 Волосы", "💅 Маникюр", "👁 Ресницы", "💆 Массаж"}:
-        category_map = {
-            "💇 Волосы": "hair",
-            "💅 Маникюр": "nails",
-            "👁 Ресницы": "lashes",
-            "💆 Массаж": "massage",
-        }
-        context.user_data["category"] = category_map[text]
+    if text in CATEGORY_BUTTONS:
+        context.user_data["category"] = CATEGORY_BUTTONS[text]
+
         await update.message.reply_text(
-            "👤 Выберите мастера",
+            "👤 Выберите мастера.",
             reply_markup=master_menu(),
         )
+        return
 
-    elif text == "Мастеров пока нет":
-        await update.message.reply_text(
-            "Пока нет доступных мастеров.",
-            reply_markup=main_menu(),
-        )
-
-    elif text.startswith("👤"):
-        match = re.search(r"#(\d+)", text)
-        if match is None:
+    if text.startswith("👤") and "#" in text:
+        try:
+            master_id = int(text.split("#", 1)[1].split()[0])
+            master_name = (
+                text.split("·", 1)[0]
+                .replace("👤", "")
+                .strip()
+            )
+        except (ValueError, IndexError):
             await update.message.reply_text(
-                "Не удалось определить мастера. Выберите его кнопкой ещё раз.",
-                reply_markup=master_menu(),
+                "Не удалось определить мастера. Выберите мастера кнопкой."
             )
             return
 
-        master_id = int(match.group(1))
-        service_id = _get_first_service_id(master_id)
-        if service_id is None:
+        db = SessionLocal()
+        try:
+            service = db.scalar(
+                select(Service)
+                .where(Service.master_id == master_id)
+                .order_by(Service.id)
+            )
+        finally:
+            db.close()
+
+        if service is None:
             await update.message.reply_text(
-                "У этого мастера пока нет доступных услуг.",
+                "У этого мастера пока нет добавленных услуг.",
                 reply_markup=main_menu(),
             )
+            clear_booking_data(context)
             return
 
-        master_name = text.split("·")[0].replace("👤", "").strip()
         context.user_data["master_id"] = master_id
         context.user_data["master_name"] = master_name
-        context.user_data["service_id"] = service_id
+        context.user_data["service_id"] = service.id
+        context.user_data["service_title"] = service.title
 
         await update.message.reply_text(
-            "📅 Выберите дату",
+            f"✅ Мастер: {master_name}\n"
+            f"💼 Услуга: {service.title}\n\n"
+            "📅 Выберите дату.",
             reply_markup=date_menu(),
         )
+        return
 
-    elif text in DATE_OFFSETS:
-        context.user_data["booking_date"] = (
-            datetime.now().date() + timedelta(days=DATE_OFFSETS[text])
-        )
+    if text in DATE_BUTTONS:
+        selected_date = date.today() + timedelta(days=DATE_BUTTONS[text])
+        context.user_data["booking_date"] = selected_date
+
         await update.message.reply_text(
-            "🕒 Выберите время",
+            f"✅ Дата: {selected_date.strftime('%d.%m.%Y')}\n\n"
+            "🕒 Выберите время.",
             reply_markup=time_menu(),
         )
+        return
 
-    elif text in TIME_BUTTONS:
-        time_text = text.split()[-1]
-        context.user_data["booking_time"] = datetime.strptime(
-            time_text,
+    if text in TIME_BUTTONS:
+        selected_time = datetime.strptime(
+            TIME_BUTTONS[text],
             "%H:%M",
         ).time()
-        context.user_data["time_text"] = time_text
 
-        required = {
-            "city",
-            "category",
+        context.user_data["booking_time"] = selected_time
+
+        await update.message.reply_text(
+            "📋 Подтверждение записи\n\n"
+            f"🏙 Город: {context.user_data.get('city', '—')}\n"
+            f"📂 Категория: {context.user_data.get('category', '—')}\n"
+            f"👤 Мастер: {context.user_data.get('master_name', '—')}\n"
+            f"💼 Услуга: {context.user_data.get('service_title', '—')}\n"
+            f"📅 Дата: "
+            f"{context.user_data.get('booking_date').strftime('%d.%m.%Y') if context.user_data.get('booking_date') else '—'}\n"
+            f"🕒 Время: {selected_time.strftime('%H:%M')}\n\n"
+            "Подтвердить запись?",
+            reply_markup=confirm_menu(),
+        )
+        return
+
+    if text == "✅ Подтвердить":
+        required_fields = (
             "master_id",
             "service_id",
             "booking_date",
             "booking_time",
-        }
-        if not required.issubset(context.user_data):
-            context.user_data.clear()
+        )
+
+        if not all(context.user_data.get(field) for field in required_fields):
+            clear_booking_data(context)
             await update.message.reply_text(
-                "Сессия записи устарела. Начните запись заново.",
+                "⚠️ Данные записи заполнены не полностью. Начните заново.",
                 reply_markup=main_menu(),
             )
             return
 
-        await update.message.reply_text(
-            _format_summary(context),
-            reply_markup=confirm_menu(),
-        )
-
-    elif text == "✅ Подтвердить":
         try:
-            create_booking(
+            created_booking = create_booking(
                 telegram_id=update.effective_user.id,
                 master_id=context.user_data["master_id"],
                 service_id=context.user_data["service_id"],
                 booking_date=context.user_data["booking_date"],
                 booking_time=context.user_data["booking_time"],
             )
-        except KeyError:
-            context.user_data.clear()
-            await update.message.reply_text(
-                "Сессия записи устарела. Начните запись заново.",
-                reply_markup=main_menu(),
-            )
-            return
         except ValueError as error:
             await update.message.reply_text(
-                f"❌ {error}",
-                reply_markup=time_menu(),
+                f"⚠️ {error}",
+                reply_markup=main_menu(),
             )
+            clear_booking_data(context)
             return
         except Exception:
             await update.message.reply_text(
-                "❌ Не удалось создать запись. Попробуйте ещё раз позже.",
+                "❌ Не удалось создать запись. Попробуйте ещё раз.",
                 reply_markup=main_menu(),
             )
+            clear_booking_data(context)
             return
 
-        context.user_data.clear()
+        clear_booking_data(context)
+
         await update.message.reply_text(
             "🎉 Запись успешно создана!\n\n"
-            "Она появится в вашем личном кабинете.",
+            f"Номер записи: {created_booking.id}",
             reply_markup=main_menu(),
         )
+        return
 
-    elif text == "❌ Отменить":
-        context.user_data.clear()
+    if text == "❌ Отменить":
+        clear_booking_data(context)
+
         await update.message.reply_text(
             "❌ Запись отменена.",
             reply_markup=main_menu(),
         )
+        return
 
-    elif text == "⬅️ Назад":
-        context.user_data.clear()
+    if text == "⬅️ Назад":
+        clear_booking_data(context)
+
         await update.message.reply_text(
             "🏠 Главное меню",
             reply_markup=main_menu(),
         )
+        return
 
-    else:
+    if text == "Мастеров пока нет":
         await update.message.reply_text(
-            "Пожалуйста, используйте кнопки меню.",
+            "В системе пока нет доступных мастеров.",
             reply_markup=main_menu(),
         )
+        return
+
+    await update.message.reply_text(
+        "Пожалуйста, используйте кнопки меню.",
+        reply_markup=main_menu(),
+    )
 
 
 menu_handler = MessageHandler(
