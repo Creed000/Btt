@@ -7,9 +7,13 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 from app.database.bookings import create_booking
 from app.database.session import SessionLocal
 from app.handlers.booking import booking
-from app.handlers.profile import profile
 from app.handlers.master_panel import become_master
+from app.handlers.profile import profile
 from app.handlers.search import search
+from app.handlers.service_manager import (
+    begin_add_service,
+    process_service_creation,
+)
 from app.keyboards.category import category_menu
 from app.keyboards.confirm import confirm_menu
 from app.keyboards.date import date_menu
@@ -143,6 +147,17 @@ async def menu(
 
     text = update.message.text.strip()
 
+    # Важно: сначала продолжаем незавершённое добавление услуги.
+    # Иначе кнопки категорий будут восприняты как запись клиента.
+    if context.user_data.get("service_creation"):
+        handled = await process_service_creation(update, context)
+        if handled:
+            return
+
+    if text == "➕ Добавить услугу":
+        await begin_add_service(update, context)
+        return
+
     if text.startswith("❌ Отменить запись #"):
         try:
             booking_id = int(text.rsplit("#", 1)[1])
@@ -179,7 +194,7 @@ async def menu(
             "📅 Записаться — запись к мастеру\n"
             "🔍 Найти мастера — поиск по каталогу\n"
             "👤 Личный кабинет — ваши записи\n"
-            "💼 Стать мастером — регистрация мастера\n"
+            "💼 Стать мастером — кабинет мастера\n"
             "⚙️ Настройки — настройки аккаунта",
             reply_markup=main_menu(),
         )
