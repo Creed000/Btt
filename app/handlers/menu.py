@@ -25,6 +25,7 @@ from app.keyboards.confirm import confirm_menu
 from app.keyboards.date import date_menu
 from app.keyboards.main import main_menu
 from app.keyboards.master import master_menu
+from app.keyboards.service import service_menu
 from app.keyboards.time import time_menu
 from app.models.booking import Booking
 from app.models.service import Service
@@ -327,15 +328,17 @@ async def menu(
         db = SessionLocal()
 
         try:
-            service = db.scalar(
-                select(Service)
-                .where(Service.master_id == master_id)
-                .order_by(Service.id)
+            services = list(
+                db.scalars(
+                    select(Service)
+                    .where(Service.master_id == master_id)
+                    .order_by(Service.title)
+                ).all()
             )
         finally:
             db.close()
 
-        if service is None:
+        if not services:
             await update.message.reply_text(
                 "Ð£ ÑÑÐ¾Ð³Ð¾ Ð¼Ð°ÑÑÐµÑÐ° Ð¿Ð¾ÐºÐ° Ð½ÐµÑ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð½ÑÑ ÑÑÐ»ÑÐ³.",
                 reply_markup=main_menu(),
@@ -345,15 +348,72 @@ async def menu(
 
         context.user_data["master_id"] = master_id
         context.user_data["master_name"] = master_name
+        context.user_data.pop("service_id", None)
+        context.user_data.pop("service_title", None)
+
+        await update.message.reply_text(
+            f"â ÐÐ°ÑÑÐµÑ: {master_name}\n\n"
+            "ð¼ Ð¢ÐµÐ¿ÐµÑÑ Ð²ÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ»ÑÐ³Ñ:",
+            reply_markup=service_menu(services),
+        )
+        return
+
+    if text.startswith("ð¼") and "#" in text:
+        try:
+            service_id = int(text.split("#", 1)[1].split()[0])
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ ÑÑÐ»ÑÐ³Ñ. ÐÑÐ±ÐµÑÐ¸ÑÐµ ÐµÑ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹."
+            )
+            return
+
+        master_id = context.user_data.get("master_id")
+
+        if master_id is None:
+            await update.message.reply_text(
+                "Ð¡Ð½Ð°ÑÐ°Ð»Ð° Ð²ÑÐ±ÐµÑÐ¸ÑÐµ Ð¼Ð°ÑÑÐµÑÐ°.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        db = SessionLocal()
+
+        try:
+            service = db.scalar(
+                select(Service).where(
+                    Service.id == service_id,
+                    Service.master_id == master_id,
+                )
+            )
+        finally:
+            db.close()
+
+        if service is None:
+            await update.message.reply_text(
+                "Ð£ÑÐ»ÑÐ³Ð° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð° Ð¸Ð»Ð¸ Ð½Ðµ Ð¿ÑÐ¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ Ð²ÑÐ±ÑÐ°Ð½Ð½Ð¾Ð¼Ñ Ð¼Ð°ÑÑÐµÑÑ.",
+                reply_markup=main_menu(),
+            )
+            clear_booking_data(context)
+            return
+
         context.user_data["service_id"] = service.id
         context.user_data["service_title"] = service.title
 
         await update.message.reply_text(
-            f"â ÐÐ°ÑÑÐµÑ: {master_name}\n"
-            f"ð¼ Ð£ÑÐ»ÑÐ³Ð°: {service.title}\n\n"
+            f"â Ð£ÑÐ»ÑÐ³Ð°: {service.title}\n"
+            f"â± ÐÐ»Ð¸ÑÐµÐ»ÑÐ½Ð¾ÑÑÑ: {service.duration} Ð¼Ð¸Ð½.\n"
+            f"ð° Ð¦ÐµÐ½Ð°: {service.price}\n\n"
             "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´Ð°ÑÑ.",
             reply_markup=date_menu(),
         )
+        return
+
+    if text == "Ð£ÑÐ»ÑÐ³ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ":
+        await update.message.reply_text(
+            "Ð£ Ð²ÑÐ±ÑÐ°Ð½Ð½Ð¾Ð³Ð¾ Ð¼Ð°ÑÑÐµÑÐ° Ð¿Ð¾ÐºÐ° Ð½ÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð½ÑÑ ÑÑÐ»ÑÐ³.",
+            reply_markup=main_menu(),
+        )
+        clear_booking_data(context)
         return
 
     if text in DATE_BUTTONS:
