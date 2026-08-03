@@ -1,7 +1,15 @@
 from telegram import KeyboardButton, ReplyKeyboardMarkup
 
 
-def main_menu():
+ADMIN_ROLES = {
+    "admin",
+    "owner",
+}
+
+
+def main_menu(
+    role: str | None = None,
+) -> ReplyKeyboardMarkup:
     keyboard = [
         [
             KeyboardButton("📅 Записаться"),
@@ -16,6 +24,11 @@ def main_menu():
             KeyboardButton("⚙️ Настройки"),
         ],
     ]
+
+    if role in ADMIN_ROLES:
+        keyboard.append(
+            [KeyboardButton("👑 Админ-панель")]
+        )
 
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
