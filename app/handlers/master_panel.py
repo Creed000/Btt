@@ -17,6 +17,7 @@ def master_panel_menu(master: Master) -> ReplyKeyboardMarkup:
     )
 
     keyboard = [
+        [KeyboardButton("📅 Мои записи")],
         [KeyboardButton("➕ Добавить услугу")],
         [KeyboardButton("📋 Мои услуги")],
         [KeyboardButton(booking_button)],
