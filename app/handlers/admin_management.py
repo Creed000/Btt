@@ -1,9 +1,13 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from app.database.session import SessionLocal
+from app.handlers.admin_controls import (
+    admin_masters_actions_menu,
+    admin_users_actions_menu,
+)
 from app.handlers.admin_panel import admin_menu
 from app.keyboards.main import main_menu
 from app.models.booking import Booking
@@ -20,57 +24,41 @@ STATUS_NAMES = {
 }
 
 
-def admin_back_menu() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton("👑 Админ-панель")],
-            [KeyboardButton("⬅️ Назад")],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=False,
-    )
-
-
-async def get_admin_user(
-    update: Update,
-):
-    db = SessionLocal()
-
-    try:
-        user = db.scalar(
-            select(User).where(
-                User.telegram_id == update.effective_user.id
-            )
+def get_admin_user(
+    db,
+    telegram_id: int,
+) -> User | None:
+    return db.scalar(
+        select(User).where(
+            User.telegram_id == telegram_id,
+            User.role.in_({"admin", "owner"}),
+            User.is_active.is_(True),
         )
-
-        if user is None or user.role not in {"admin", "owner"}:
-            return None
-
-        return user
-
-    finally:
-        db.close()
+    )
 
 
 async def show_admin_users(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
-        return
-
-    admin = await get_admin_user(update)
-
-    if admin is None:
-        await update.message.reply_text(
-            "⛔ У вас нет доступа.",
-            reply_markup=main_menu(),
-        )
+    if update.message is None or update.effective_user is None:
         return
 
     db = SessionLocal()
 
     try:
+        admin = get_admin_user(
+            db,
+            update.effective_user.id,
+        )
+
+        if admin is None:
+            await update.message.reply_text(
+                "⛔ У вас нет доступа.",
+                reply_markup=main_menu(),
+            )
+            return
+
         users = list(
             db.scalars(
                 select(User)
@@ -82,8 +70,7 @@ async def show_admin_users(
         lines = ["👥 Пользователи"]
 
         if not users:
-            lines.append("")
-            lines.append("Пользователей пока нет.")
+            lines.extend(["", "Пользователей пока нет."])
         else:
             for user in users:
                 username = (
@@ -106,7 +93,7 @@ async def show_admin_users(
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=admin_back_menu(),
+            reply_markup=admin_users_actions_menu(users),
         )
 
     except Exception:
@@ -123,21 +110,24 @@ async def show_admin_masters(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
-        return
-
-    admin = await get_admin_user(update)
-
-    if admin is None:
-        await update.message.reply_text(
-            "⛔ У вас нет доступа.",
-            reply_markup=main_menu(),
-        )
+    if update.message is None or update.effective_user is None:
         return
 
     db = SessionLocal()
 
     try:
+        admin = get_admin_user(
+            db,
+            update.effective_user.id,
+        )
+
+        if admin is None:
+            await update.message.reply_text(
+                "⛔ У вас нет доступа.",
+                reply_markup=main_menu(),
+            )
+            return
+
         masters = list(
             db.scalars(
                 select(Master)
@@ -153,8 +143,7 @@ async def show_admin_masters(
         lines = ["🧑‍💼 Мастера"]
 
         if not masters:
-            lines.append("")
-            lines.append("Мастеров пока нет.")
+            lines.extend(["", "Мастеров пока нет."])
         else:
             for master in masters:
                 name = (
@@ -185,7 +174,7 @@ async def show_admin_masters(
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=admin_back_menu(),
+            reply_markup=admin_masters_actions_menu(masters),
         )
 
     except Exception:
@@ -202,21 +191,24 @@ async def show_admin_bookings(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
-        return
-
-    admin = await get_admin_user(update)
-
-    if admin is None:
-        await update.message.reply_text(
-            "⛔ У вас нет доступа.",
-            reply_markup=main_menu(),
-        )
+    if update.message is None or update.effective_user is None:
         return
 
     db = SessionLocal()
 
     try:
+        admin = get_admin_user(
+            db,
+            update.effective_user.id,
+        )
+
+        if admin is None:
+            await update.message.reply_text(
+                "⛔ У вас нет доступа.",
+                reply_markup=main_menu(),
+            )
+            return
+
         bookings = list(
             db.scalars(
                 select(Booking)
@@ -236,8 +228,7 @@ async def show_admin_bookings(
         lines = ["📅 Все записи"]
 
         if not bookings:
-            lines.append("")
-            lines.append("Записей пока нет.")
+            lines.extend(["", "Записей пока нет."])
         else:
             for booking in bookings:
                 client_name = (
@@ -278,7 +269,7 @@ async def show_admin_bookings(
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=admin_back_menu(),
+            reply_markup=admin_menu(),
         )
 
     except Exception:
@@ -295,21 +286,24 @@ async def show_admin_statistics(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
-        return
-
-    admin = await get_admin_user(update)
-
-    if admin is None:
-        await update.message.reply_text(
-            "⛔ У вас нет доступа.",
-            reply_markup=main_menu(),
-        )
+    if update.message is None or update.effective_user is None:
         return
 
     db = SessionLocal()
 
     try:
+        admin = get_admin_user(
+            db,
+            update.effective_user.id,
+        )
+
+        if admin is None:
+            await update.message.reply_text(
+                "⛔ У вас нет доступа.",
+                reply_markup=main_menu(),
+            )
+            return
+
         users_count = db.scalar(
             select(func.count(User.id))
         ) or 0
@@ -346,7 +340,7 @@ async def show_admin_statistics(
             f"📅 Всего записей: {bookings_count}\n"
             f"🏁 Завершённых: {completed_count}\n"
             f"❌ Отменённых: {cancelled_count}",
-            reply_markup=admin_back_menu(),
+            reply_markup=admin_menu(),
         )
 
     except Exception:
