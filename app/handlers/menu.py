@@ -8,6 +8,7 @@ from app.database.bookings import create_booking
 from app.database.session import SessionLocal
 from app.handlers.booking import booking
 from app.handlers.profile import profile
+from app.handlers.master_panel import become_master
 from app.handlers.search import search
 from app.keyboards.category import category_menu
 from app.keyboards.confirm import confirm_menu
@@ -169,10 +170,7 @@ async def menu(
         return
 
     if text == "💼 Стать мастером":
-        await update.message.reply_text(
-            "💼 Регистрация мастера появится в следующем этапе.",
-            reply_markup=main_menu(),
-        )
+        await become_master(update, context)
         return
 
     if text == "ℹ️ Помощь":
