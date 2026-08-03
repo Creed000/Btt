@@ -4,36 +4,35 @@ from telegram.ext import ContextTypes
 
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
-from app.models.master import Master
 from app.models.salon import Salon
 from app.models.user import User
 
 
-SALON_PLANS = {
-    "salon_free": {
-        "title": "Salon Free",
+PLANS = {
+    "free": {
+        "title": "Free",
         "price": 0,
         "masters": 1,
         "branches": 1,
-        "description": "Для тестирования системы",
+        "description": "Для знакомства с сервисом",
     },
-    "salon_basic": {
-        "title": "Salon Basic",
-        "price": 1490,
+    "basic": {
+        "title": "Basic",
+        "price": 990,
         "masters": 3,
         "branches": 1,
         "description": "Для небольшого салона",
     },
-    "salon_pro": {
-        "title": "Salon Pro",
-        "price": 3490,
+    "pro": {
+        "title": "Pro",
+        "price": 2490,
         "masters": 10,
         "branches": 3,
-        "description": "Для растущего салона",
+        "description": "Для растущего бизнеса",
     },
-    "salon_business": {
-        "title": "Salon Business",
-        "price": 6990,
+    "business": {
+        "title": "Business",
+        "price": 4990,
         "masters": 50,
         "branches": 10,
         "description": "Для сети салонов",
@@ -41,50 +40,26 @@ SALON_PLANS = {
 }
 
 
-MASTER_PLANS = {
-    "master_free": {
-        "title": "Master Free",
-        "price": 0,
-        "services": 3,
-        "bookings_per_month": 30,
-        "description": "Для начинающего мастера",
-    },
-    "master_start": {
-        "title": "Master Start",
-        "price": 390,
-        "services": 10,
-        "bookings_per_month": 150,
-        "description": "Для индивидуального мастера",
-    },
-    "master_pro": {
-        "title": "Master Pro",
-        "price": 790,
-        "services": 50,
-        "bookings_per_month": 1000,
-        "description": "Для активно работающего мастера",
-    },
-    "master_unlimited": {
-        "title": "Master Unlimited",
-        "price": 1290,
-        "services": 9999,
-        "bookings_per_month": 999999,
-        "description": "Без ограничений",
-    },
-}
-
-
-def salon_plans_menu(
-    current_plan: str,
-) -> ReplyKeyboardMarkup:
+def plans_menu(current_plan: str) -> ReplyKeyboardMarkup:
     keyboard: list[list[KeyboardButton]] = []
 
-    for plan_code, plan in SALON_PLANS.items():
+    for plan_code, plan in PLANS.items():
         if plan_code == current_plan:
-            label = f"✅ Текущий тариф: {plan['title']}"
+            keyboard.append(
+                [
+                    KeyboardButton(
+                        f"✅ Текущий тариф: {plan['title']}"
+                    )
+                ]
+            )
         else:
-            label = f"💳 Выбрать тариф {plan['title']}"
-
-        keyboard.append([KeyboardButton(label)])
+            keyboard.append(
+                [
+                    KeyboardButton(
+                        f"💳 Выбрать тариф {plan['title']}"
+                    )
+                ]
+            )
 
     keyboard.extend(
         [
@@ -97,50 +72,34 @@ def salon_plans_menu(
         keyboard=keyboard,
         resize_keyboard=True,
         one_time_keyboard=False,
-        input_field_placeholder="Тарифы для салона",
+        input_field_placeholder="Выберите тариф",
     )
 
 
-def master_plans_menu(
-    current_plan: str,
-) -> ReplyKeyboardMarkup:
-    keyboard: list[list[KeyboardButton]] = []
-
-    for plan_code, plan in MASTER_PLANS.items():
-        if plan_code == current_plan:
-            label = f"✅ Текущий тариф: {plan['title']}"
-        else:
-            label = f"💳 Выбрать тариф {plan['title']}"
-
-        keyboard.append([KeyboardButton(label)])
-
-    keyboard.extend(
-        [
-            [KeyboardButton("💼 Стать мастером")],
-            [KeyboardButton("⬅️ Назад")],
-        ]
-    )
-
-    return ReplyKeyboardMarkup(
-        keyboard=keyboard,
-        resize_keyboard=True,
-        one_time_keyboard=False,
-        input_field_placeholder="Тарифы для мастера",
-    )
-
-
-def get_user(
+def get_owner_and_salon(
     db,
     telegram_id: int,
-) -> User | None:
-    return db.scalar(
+) -> tuple[User | None, Salon | None]:
+    user = db.scalar(
         select(User).where(
             User.telegram_id == telegram_id
         )
     )
 
+    if user is None:
+        return None, None
 
-async def show_subscription_choice(
+    salon = db.scalar(
+        select(Salon).where(
+            Salon.owner_id == user.id,
+            Salon.is_active.is_(True),
+        )
+    )
+
+    return user, salon
+
+
+async def show_available_plans(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
@@ -150,7 +109,7 @@ async def show_subscription_choice(
     db = SessionLocal()
 
     try:
-        user = get_user(
+        user, salon = get_owner_and_salon(
             db,
             update.effective_user.id,
         )
@@ -161,83 +120,6 @@ async def show_subscription_choice(
                 reply_markup=main_menu(),
             )
             return
-
-        salon = db.scalar(
-            select(Salon).where(
-                Salon.owner_id == user.id,
-                Salon.is_active.is_(True),
-            )
-        )
-
-        master = db.scalar(
-            select(Master).where(
-                Master.user_id == user.id
-            )
-        )
-
-        keyboard = []
-
-        if salon is not None:
-            keyboard.append(
-                [KeyboardButton("🏢 Тарифы для салона")]
-            )
-
-        if master is not None:
-            keyboard.append(
-                [KeyboardButton("👤 Тарифы для мастера")]
-            )
-
-        if not keyboard:
-            await update.message.reply_text(
-                "У вас пока нет профиля мастера или салона.",
-                reply_markup=main_menu(role=user.role),
-            )
-            return
-
-        keyboard.append(
-            [KeyboardButton("⬅️ Назад")]
-        )
-
-        await update.message.reply_text(
-            "💳 Выберите тип подписки:",
-            reply_markup=ReplyKeyboardMarkup(
-                keyboard=keyboard,
-                resize_keyboard=True,
-            ),
-        )
-
-    finally:
-        db.close()
-
-
-async def show_salon_plans(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    if update.message is None or update.effective_user is None:
-        return
-
-    db = SessionLocal()
-
-    try:
-        user = get_user(
-            db,
-            update.effective_user.id,
-        )
-
-        if user is None:
-            await update.message.reply_text(
-                "❌ Пользователь не найден.",
-                reply_markup=main_menu(),
-            )
-            return
-
-        salon = db.scalar(
-            select(Salon).where(
-                Salon.owner_id == user.id,
-                Salon.is_active.is_(True),
-            )
-        )
 
         if salon is None:
             await update.message.reply_text(
@@ -246,15 +128,17 @@ async def show_salon_plans(
             )
             return
 
-        current_plan = salon.plan or "salon_free"
-
         lines = [
-            "🏢 Тарифы для салона",
+            "💳 Тарифы BTT",
             "",
         ]
 
-        for code, plan in SALON_PLANS.items():
-            marker = "✅" if code == current_plan else "▫️"
+        for plan_code, plan in PLANS.items():
+            marker = (
+                "✅"
+                if plan_code == salon.plan
+                else "▫️"
+            )
 
             lines.extend(
                 [
@@ -268,87 +152,13 @@ async def show_salon_plans(
 
         await update.message.reply_text(
             "\n".join(lines).strip(),
-            reply_markup=salon_plans_menu(current_plan),
+            reply_markup=plans_menu(salon.plan),
         )
 
-    finally:
-        db.close()
-
-
-async def show_master_plans(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    if update.message is None or update.effective_user is None:
-        return
-
-    db = SessionLocal()
-
-    try:
-        user = get_user(
-            db,
-            update.effective_user.id,
-        )
-
-        if user is None:
-            await update.message.reply_text(
-                "❌ Пользователь не найден.",
-                reply_markup=main_menu(),
-            )
-            return
-
-        master = db.scalar(
-            select(Master).where(
-                Master.user_id == user.id
-            )
-        )
-
-        if master is None:
-            await update.message.reply_text(
-                "❌ Профиль мастера не найден.",
-                reply_markup=main_menu(role=user.role),
-            )
-            return
-
-        current_plan = getattr(
-            master,
-            "plan",
-            "master_free",
-        )
-
-        lines = [
-            "👤 Тарифы для индивидуального мастера",
-            "",
-        ]
-
-        for code, plan in MASTER_PLANS.items():
-            marker = "✅" if code == current_plan else "▫️"
-
-            bookings_limit = (
-                "без ограничений"
-                if plan["bookings_per_month"] >= 999999
-                else str(plan["bookings_per_month"])
-            )
-
-            services_limit = (
-                "без ограничений"
-                if plan["services"] >= 9999
-                else str(plan["services"])
-            )
-
-            lines.extend(
-                [
-                    f"{marker} {plan['title']} — {plan['price']} сом/мес.",
-                    f"Услуг: {services_limit}",
-                    f"Записей в месяц: {bookings_limit}",
-                    plan["description"],
-                    "",
-                ]
-            )
-
+    except Exception:
         await update.message.reply_text(
-            "\n".join(lines).strip(),
-            reply_markup=master_plans_menu(current_plan),
+            "❌ Не удалось загрузить тарифы.",
+            reply_markup=main_menu(),
         )
 
     finally:
@@ -364,39 +174,60 @@ async def request_plan_change(
         return
 
     selected_code = None
-    selected_type = None
-    selected_plan = None
 
-    for code, plan in SALON_PLANS.items():
+    for plan_code, plan in PLANS.items():
         if plan["title"].lower() == plan_title.lower():
-            selected_code = code
-            selected_type = "salon"
-            selected_plan = plan
+            selected_code = plan_code
             break
 
     if selected_code is None:
-        for code, plan in MASTER_PLANS.items():
-            if plan["title"].lower() == plan_title.lower():
-                selected_code = code
-                selected_type = "master"
-                selected_plan = plan
-                break
-
-    if selected_code is None or selected_plan is None:
         await update.message.reply_text(
             "❌ Тариф не найден.",
             reply_markup=main_menu(),
         )
         return
 
-    context.user_data["requested_plan"] = selected_code
-    context.user_data["requested_plan_type"] = selected_type
+    db = SessionLocal()
 
-    await update.message.reply_text(
-        "🧾 Запрос на смену тарифа\n\n"
-        f"Тип: {'Салон' if selected_type == 'salon' else 'Мастер'}\n"
-        f"Тариф: {selected_plan['title']}\n"
-        f"Стоимость: {selected_plan['price']} сом/мес.\n\n"
-        "Запрос сохранён. Онлайн-оплату подключим следующим этапом.",
-        reply_markup=main_menu(),
-    )
+    try:
+        user, salon = get_owner_and_salon(
+            db,
+            update.effective_user.id,
+        )
+
+        if user is None or salon is None:
+            await update.message.reply_text(
+                "❌ Активный салон не найден.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        if salon.plan == selected_code:
+            await update.message.reply_text(
+                "ℹ️ Этот тариф уже подключён.",
+                reply_markup=plans_menu(salon.plan),
+            )
+            return
+
+        context.user_data["requested_plan"] = selected_code
+
+        plan = PLANS[selected_code]
+
+        await update.message.reply_text(
+            "🧾 Запрос на смену тарифа\n\n"
+            f"Салон: {salon.name}\n"
+            f"Новый тариф: {plan['title']}\n"
+            f"Стоимость: {plan['price']} сом/мес.\n\n"
+            "Онлайн-оплату подключим следующим этапом. "
+            "Пока запрос сохранён в текущей сессии.",
+            reply_markup=plans_menu(salon.plan),
+        )
+
+    except Exception:
+        await update.message.reply_text(
+            "❌ Не удалось подготовить смену тарифа.",
+            reply_markup=main_menu(),
+        )
+
+    finally:
+        db.close()
