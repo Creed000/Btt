@@ -13,6 +13,8 @@ from app.handlers.search import search
 from app.handlers.service_manager import (
     begin_add_service,
     process_service_creation,
+    show_master_services,
+    toggle_master_booking,
 )
 from app.keyboards.category import category_menu
 from app.keyboards.confirm import confirm_menu
@@ -147,17 +149,38 @@ async def menu(
 
     text = update.message.text.strip()
 
-    # Важно: сначала продолжаем незавершённое добавление услуги.
-    # Иначе кнопки категорий будут восприняты как запись клиента.
+    # Продолжаем незавершённое добавление услуги.
     if context.user_data.get("service_creation"):
         handled = await process_service_creation(update, context)
         if handled:
             return
 
+    # Кабинет мастера.
     if text == "➕ Добавить услугу":
         await begin_add_service(update, context)
         return
 
+    if text == "📋 Мои услуги":
+        await show_master_services(update, context)
+        return
+
+    if text == "⛔ Выключить запись":
+        await toggle_master_booking(
+            update,
+            context,
+            enabled=False,
+        )
+        return
+
+    if text == "✅ Включить запись":
+        await toggle_master_booking(
+            update,
+            context,
+            enabled=True,
+        )
+        return
+
+    # Отмена клиентской записи.
     if text.startswith("❌ Отменить запись #"):
         try:
             booking_id = int(text.rsplit("#", 1)[1])
@@ -171,6 +194,7 @@ async def menu(
         await cancel_client_booking(update, booking_id)
         return
 
+    # Главное меню.
     if text == "📅 Записаться":
         clear_booking_data(context)
         await booking(update, context)
@@ -207,6 +231,7 @@ async def menu(
         )
         return
 
+    # Создание записи клиента.
     if text in CITY_BUTTONS:
         context.user_data["city"] = CITY_BUTTONS[text]
 
