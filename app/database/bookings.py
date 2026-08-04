@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -8,6 +8,21 @@ from app.models.booking import Booking
 from app.models.master import Master
 from app.models.service import Service
 from app.models.user import User
+
+
+ACTIVE_BOOKING_STATUSES = {
+    "new",
+    "confirmed",
+}
+
+
+def _intervals_overlap(
+    first_start: datetime,
+    first_end: datetime,
+    second_start: datetime,
+    second_end: datetime,
+) -> bool:
+    return first_start < second_end and second_start < first_end
 
 
 def create_booking(
@@ -60,29 +75,62 @@ def create_booking(
                 "Услуга не найдена или не принадлежит выбранному мастеру."
             )
 
-        selected_datetime = datetime.combine(
+        selected_start = datetime.combine(
             booking_date,
             booking_time,
         )
 
-        if selected_datetime <= datetime.now():
+        selected_end = selected_start + timedelta(
+            minutes=service.duration
+        )
+
+        if selected_start <= datetime.now():
             raise ValueError(
                 "Нельзя записаться на прошедшую дату или время."
             )
 
-        busy_booking = db.scalar(
-            select(Booking).where(
-                Booking.master_id == master_id,
-                Booking.booking_date == booking_date,
-                Booking.booking_time == booking_time,
-                Booking.status.in_(["new", "confirmed"]),
-            )
+        existing_bookings = list(
+            db.scalars(
+                select(Booking)
+                .options(
+                    joinedload(Booking.service)
+                )
+                .where(
+                    Booking.master_id == master_id,
+                    Booking.booking_date == booking_date,
+                    Booking.status.in_(
+                        ACTIVE_BOOKING_STATUSES
+                    ),
+                )
+            ).all()
         )
 
-        if busy_booking is not None:
-            raise ValueError(
-                "Это время уже занято. Выберите другой слот."
+        for existing in existing_bookings:
+            existing_start = datetime.combine(
+                existing.booking_date,
+                existing.booking_time,
             )
+
+            existing_duration = (
+                existing.service.duration
+                if existing.service
+                else 30
+            )
+
+            existing_end = existing_start + timedelta(
+                minutes=existing_duration
+            )
+
+            if _intervals_overlap(
+                selected_start,
+                selected_end,
+                existing_start,
+                existing_end,
+            ):
+                raise ValueError(
+                    "Выбранное время пересекается с другой записью. "
+                    "Выберите другой свободный слот."
+                )
 
         booking = Booking(
             client_id=user.id,
@@ -100,7 +148,9 @@ def create_booking(
             select(Booking)
             .options(
                 joinedload(Booking.client),
-                joinedload(Booking.master).joinedload(Master.user),
+                joinedload(Booking.master).joinedload(
+                    Master.user
+                ),
                 joinedload(Booking.service),
             )
             .where(Booking.id == booking.id)
@@ -111,7 +161,6 @@ def create_booking(
                 "Созданная запись не найдена."
             )
 
-        # Загруженные связи останутся доступны после закрытия сессии.
         db.expunge_all()
 
         return loaded_booking
