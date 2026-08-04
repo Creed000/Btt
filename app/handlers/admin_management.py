@@ -14,6 +14,7 @@ from app.models.booking import Booking
 from app.models.master import Master
 from app.models.service import Service
 from app.models.user import User
+from app.services.access_control import can_manage_platform
 
 
 STATUS_NAMES = {
@@ -24,16 +25,35 @@ STATUS_NAMES = {
 }
 
 
-def get_admin_user(
+def get_platform_admin(
     db,
     telegram_id: int,
 ) -> User | None:
-    return db.scalar(
+    user = db.scalar(
         select(User).where(
-            User.telegram_id == telegram_id,
-            User.role.in_({"admin", "owner"}),
-            User.is_active.is_(True),
+            User.telegram_id == telegram_id
         )
+    )
+
+    if not can_manage_platform(user):
+        return None
+
+    return user
+
+
+async def deny_platform_access(
+    update: Update,
+    role: str | None = None,
+) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    await update.message.reply_text(
+        "⛔ У вас нет доступа к управлению SaaS-платформой.",
+        reply_markup=main_menu(
+            role=role,
+            telegram_id=update.effective_user.id,
+        ),
     )
 
 
@@ -47,16 +67,13 @@ async def show_admin_users(
     db = SessionLocal()
 
     try:
-        admin = get_admin_user(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_platform_access(update)
             return
 
         users = list(
@@ -116,16 +133,13 @@ async def show_admin_masters(
     db = SessionLocal()
 
     try:
-        admin = get_admin_user(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_platform_access(update)
             return
 
         masters = list(
@@ -134,6 +148,8 @@ async def show_admin_masters(
                 .options(
                     joinedload(Master.user),
                     joinedload(Master.city),
+                    joinedload(Master.salon),
+                    joinedload(Master.branch),
                 )
                 .order_by(Master.id.desc())
                 .limit(30)
@@ -158,12 +174,26 @@ async def show_admin_masters(
                     else "не выбран"
                 )
 
+                salon = (
+                    master.salon.name
+                    if master.salon
+                    else "самостоятельный мастер"
+                )
+
+                branch = (
+                    master.branch.name
+                    if master.branch
+                    else "не назначен"
+                )
+
                 lines.extend(
                     [
                         "",
                         f"ID мастера: {master.id}",
                         f"Имя: {name}",
                         f"Город: {city}",
+                        f"Салон: {salon}",
+                        f"Филиал: {branch}",
                         f"Рейтинг: {master.rating:.1f}",
                         f"Приём записей: "
                         f"{'включён' if master.booking_enabled else 'выключен'}",
@@ -197,16 +227,13 @@ async def show_admin_bookings(
     db = SessionLocal()
 
     try:
-        admin = get_admin_user(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_platform_access(update)
             return
 
         bookings = list(
@@ -292,16 +319,13 @@ async def show_admin_statistics(
     db = SessionLocal()
 
     try:
-        admin = get_admin_user(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_platform_access(update)
             return
 
         users_count = db.scalar(
