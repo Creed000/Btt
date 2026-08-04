@@ -3,8 +3,7 @@ import logging
 from telegram import Update
 
 from app.bot.bot import application
-from app.database.init_db import init_db
-from app.database.schema_upgrade import upgrade_database_schema
+from app.database.prepare import prepare_database
 from app.services.timezone import APP_TIMEZONE
 
 
@@ -16,28 +15,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def prepare_database() -> None:
+if __name__ == "__main__":
     logger.info(
         "Часовой пояс приложения: %s",
         APP_TIMEZONE,
     )
 
-    logger.info(
-        "Проверка таблиц базы данных"
-    )
-    init_db()
-
-    logger.info(
-        "Проверка и обновление SaaS-схемы"
-    )
-    upgrade_database_schema()
-
-    logger.info(
-        "База данных готова"
-    )
-
-
-if __name__ == "__main__":
     prepare_database()
 
     logger.info(
