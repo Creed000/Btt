@@ -51,6 +51,7 @@ def upgrade_database_schema() -> None:
 
     salon_columns = _column_names("salons")
     master_columns = _column_names("masters")
+    booking_columns = _column_names("bookings")
 
     with engine.begin() as connection:
         def add_column_if_missing(
@@ -317,6 +318,63 @@ def upgrade_database_schema() -> None:
             )
 
         # ---------------------------------------------------------
+        # Таблица bookings
+        # ---------------------------------------------------------
+        if booking_columns:
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_24h_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_2h_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
+            # Для старых записей явно сохраняем значение false.
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_24h_sent = FALSE
+                    WHERE reminder_24h_sent IS NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_2h_sent = FALSE
+                    WHERE reminder_2h_sent IS NULL
+                    """
+                )
+            )
+
+        # ---------------------------------------------------------
         # Индексы PostgreSQL
         # ---------------------------------------------------------
         if dialect == "postgresql":
@@ -352,6 +410,24 @@ def upgrade_database_schema() -> None:
                     """
                     CREATE INDEX IF NOT EXISTS ix_masters_branch_id
                     ON masters (branch_id)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_24h
+                    ON bookings (reminder_24h_sent)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_2h
+                    ON bookings (reminder_2h_sent)
                     """
                 )
             )
