@@ -11,6 +11,7 @@ from app.models.master import Master
 from app.models.master_schedule import MasterSchedule
 from app.models.service import Service
 from app.models.user import User
+from app.services.timezone import local_today
 
 
 ACTIVE_BOOKING_STATUSES = {
@@ -122,7 +123,7 @@ def get_conflicting_bookings(
     make_day_off: bool = False,
     days_ahead: int = 90,
 ) -> list[Booking]:
-    today = date.today()
+    today = local_today()
     end_date = today + timedelta(days=days_ahead)
 
     bookings = list(
