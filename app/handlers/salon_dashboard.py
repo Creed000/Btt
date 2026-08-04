@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
@@ -10,6 +8,7 @@ from app.keyboards.main import main_menu
 from app.models.master import Master
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.timezone import local_naive_now
 
 
 def salon_owner_menu() -> ReplyKeyboardMarkup:
@@ -46,7 +45,7 @@ def subscription_status_text(
     )
 
     if salon.subscription_status == "trial" and salon.trial_ends_at:
-        remaining = salon.trial_ends_at - datetime.utcnow()
+        remaining = salon.trial_ends_at - local_naive_now()
         days = max(remaining.days, 0)
 
         return (
