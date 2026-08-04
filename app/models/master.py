@@ -101,3 +101,10 @@ class Master(Base):
         back_populates="master",
         cascade="all, delete-orphan",
     )
+
+    schedules = relationship(
+        "MasterSchedule",
+        back_populates="master",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
