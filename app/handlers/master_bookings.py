@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
@@ -11,6 +13,7 @@ from app.models.user import User
 from app.services.booking_notifications import (
     notify_client_about_status,
 )
+from app.services.timezone import local_naive_now
 
 
 STATUS_NAMES = {
@@ -21,13 +24,30 @@ STATUS_NAMES = {
 }
 
 
+def booking_starts_at(
+    booking: Booking,
+) -> datetime:
+    return datetime.combine(
+        booking.booking_date,
+        booking.booking_time,
+    )
+
+
 def master_bookings_menu(
     bookings: list[Booking],
 ) -> ReplyKeyboardMarkup:
     keyboard: list[list[KeyboardButton]] = []
+    now = local_naive_now()
 
     for booking in bookings:
-        if booking.status == "new":
+        starts_at = booking_starts_at(
+            booking
+        )
+
+        if (
+            booking.status == "new"
+            and starts_at > now
+        ):
             keyboard.append(
                 [
                     KeyboardButton(
@@ -44,22 +64,26 @@ def master_bookings_menu(
             )
 
         elif booking.status == "confirmed":
-            keyboard.append(
-                [
-                    KeyboardButton(
-                        f"🏁 Завершить запись #{booking.id}"
-                    )
-                ]
-            )
-            keyboard.append(
-                [
-                    KeyboardButton(
-                        f"❌ Отменить заявку #{booking.id}"
-                    )
-                ]
-            )
+            if starts_at <= now:
+                keyboard.append(
+                    [
+                        KeyboardButton(
+                            f"🏁 Завершить запись #{booking.id}"
+                        )
+                    ]
+                )
+            else:
+                keyboard.append(
+                    [
+                        KeyboardButton(
+                            f"❌ Отменить заявку #{booking.id}"
+                        )
+                    ]
+                )
 
-    keyboard.append([KeyboardButton("⬅️ Назад")])
+    keyboard.append(
+        [KeyboardButton("⬅️ Назад")]
+    )
 
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
@@ -107,7 +131,9 @@ async def show_master_bookings(
         if master is None:
             await update.message.reply_text(
                 "❌ Профиль мастера не найден.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
@@ -118,7 +144,9 @@ async def show_master_bookings(
                     joinedload(Booking.client),
                     joinedload(Booking.service),
                 )
-                .where(Booking.master_id == master.id)
+                .where(
+                    Booking.master_id == master.id
+                )
                 .order_by(
                     Booking.booking_date.asc(),
                     Booking.booking_time.asc(),
@@ -146,7 +174,8 @@ async def show_master_bookings(
 
                 client_phone = (
                     booking.client.phone
-                    if booking.client and booking.client.phone
+                    if booking.client
+                    and booking.client.phone
                     else "—"
                 )
 
@@ -168,21 +197,31 @@ async def show_master_bookings(
                         f"👤 Клиент: {client_name}",
                         f"📱 Телефон: {client_phone}",
                         f"💼 Услуга: {service_title}",
-                        f"📅 Дата: {booking.booking_date.strftime('%d.%m.%Y')}",
-                        f"🕒 Время: {booking.booking_time.strftime('%H:%M')}",
+                        (
+                            "📅 Дата: "
+                            f"{booking.booking_date.strftime('%d.%m.%Y')}"
+                        ),
+                        (
+                            "🕒 Время: "
+                            f"{booking.booking_time.strftime('%H:%M')}"
+                        ),
                         f"Статус: {status_text}",
                     ]
                 )
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=master_bookings_menu(bookings),
+            reply_markup=master_bookings_menu(
+                bookings
+            ),
         )
 
     except Exception:
         await update.message.reply_text(
             "❌ Не удалось загрузить записи мастера.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
@@ -191,6 +230,7 @@ async def show_master_bookings(
 
 async def change_master_booking_status(
     update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
     booking_id: int,
     new_status: str,
 ) -> None:
@@ -208,7 +248,9 @@ async def change_master_booking_status(
         if master is None:
             await update.message.reply_text(
                 "❌ Профиль мастера не найден.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
@@ -217,7 +259,9 @@ async def change_master_booking_status(
             .options(
                 joinedload(Booking.client),
                 joinedload(Booking.service),
-                joinedload(Booking.master).joinedload(Master.user),
+                joinedload(Booking.master).joinedload(
+                    Master.user
+                ),
             )
             .where(
                 Booking.id == booking_id,
@@ -228,7 +272,9 @@ async def change_master_booking_status(
         if booking is None:
             await update.message.reply_text(
                 "❌ Запись не найдена или принадлежит другому мастеру.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
@@ -245,13 +291,43 @@ async def change_master_booking_status(
         ):
             await update.message.reply_text(
                 "❌ Нельзя изменить запись из текущего статуса.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
+            )
+            return
+
+        now = local_naive_now()
+        starts_at = booking_starts_at(
+            booking
+        )
+
+        if (
+            new_status in {"confirmed", "cancelled"}
+            and starts_at <= now
+        ):
+            await update.message.reply_text(
+                "❌ Прошедшую запись нельзя подтвердить или отменить.",
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
+            )
+            return
+
+        if (
+            new_status == "completed"
+            and starts_at > now
+        ):
+            await update.message.reply_text(
+                "❌ Нельзя завершить запись до времени её начала.",
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
         booking.status = new_status
         db.commit()
-
         db.expunge_all()
 
         await notify_client_about_status(
@@ -260,14 +336,22 @@ async def change_master_booking_status(
         )
 
         result_messages = {
-            "confirmed": f"✅ Запись #{booking_id} подтверждена.",
-            "completed": f"🏁 Запись #{booking_id} завершена.",
-            "cancelled": f"❌ Запись #{booking_id} отменена.",
+            "confirmed": (
+                f"✅ Запись #{booking_id} подтверждена."
+            ),
+            "completed": (
+                f"🏁 Запись #{booking_id} завершена."
+            ),
+            "cancelled": (
+                f"❌ Запись #{booking_id} отменена."
+            ),
         }
 
         await update.message.reply_text(
             result_messages[new_status],
-            reply_markup=main_menu(),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     except Exception:
@@ -275,7 +359,9 @@ async def change_master_booking_status(
 
         await update.message.reply_text(
             "❌ Не удалось изменить статус записи.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
