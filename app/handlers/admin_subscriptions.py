@@ -10,6 +10,7 @@ from app.handlers.admin_panel import admin_menu
 from app.keyboards.main import main_menu
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.access_control import can_manage_platform
 from app.services.timezone import local_naive_now
 
 
@@ -88,16 +89,35 @@ def salon_plan_menu(
     )
 
 
-def get_admin(
+def get_platform_admin(
     db,
     telegram_id: int,
 ) -> User | None:
-    return db.scalar(
+    user = db.scalar(
         select(User).where(
-            User.telegram_id == telegram_id,
-            User.role.in_({"admin", "owner"}),
-            User.is_active.is_(True),
+            User.telegram_id == telegram_id
         )
+    )
+
+    if not can_manage_platform(user):
+        return None
+
+    return user
+
+
+async def deny_access(
+    update: Update,
+    role: str | None = None,
+) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    await update.message.reply_text(
+        "⛔ У вас нет доступа к управлению подписками SaaS.",
+        reply_markup=main_menu(
+            role=role,
+            telegram_id=update.effective_user.id,
+        ),
     )
 
 
@@ -111,16 +131,13 @@ async def show_salons_for_subscription(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         salons = list(
@@ -145,13 +162,13 @@ async def show_salons_for_subscription(
                 )
 
                 end_date = (
-                    salon.subscription_ends_at.strftime("%d.%m.%Y")
+                    salon.subscription_ends_at.strftime("%d.%m.%Y %H:%M")
                     if salon.subscription_ends_at
                     else "—"
                 )
 
                 trial_end = (
-                    salon.trial_ends_at.strftime("%d.%m.%Y")
+                    salon.trial_ends_at.strftime("%d.%m.%Y %H:%M")
                     if salon.trial_ends_at
                     else "—"
                 )
@@ -195,16 +212,13 @@ async def open_salon_subscription_control(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         salon = db.scalar(
@@ -225,7 +239,7 @@ async def open_salon_subscription_control(
             f"Салон: {salon.name}\n"
             f"Текущий тариф: {salon.plan}\n"
             f"Статус: {salon.subscription_status}\n\n"
-            "Выберите новое действие:",
+            "Выберите действие:",
             reply_markup=salon_plan_menu(salon.id),
         )
 
@@ -251,16 +265,13 @@ async def activate_salon_plan(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         salon = db.scalar(
@@ -291,7 +302,7 @@ async def activate_salon_plan(
             f"Салон: {salon.name}\n"
             f"Тариф: {PLAN_TITLES[plan_code]}\n"
             f"Активна до: "
-            f"{salon.subscription_ends_at.strftime('%d.%m.%Y')}",
+            f"{salon.subscription_ends_at.strftime('%d.%m.%Y %H:%M')}",
             reply_markup=admin_menu(),
         )
 
@@ -317,16 +328,13 @@ async def disable_salon_subscription(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         salon = db.scalar(
