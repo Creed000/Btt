@@ -34,7 +34,7 @@ class Booking(Base):
     service_id: Mapped[int] = mapped_column(
         ForeignKey(
             "services.id",
-            ondelete="CASCADE",
+            ondelete="RESTRICT",
         ),
         nullable=False,
         index=True,
@@ -58,7 +58,6 @@ class Booking(Base):
         index=True,
     )
 
-    # Общие флаги сохранены для совместимости.
     reminder_24h_sent: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
@@ -71,7 +70,6 @@ class Booking(Base):
         nullable=False,
     )
 
-    # Отдельные флаги доставки клиенту и мастеру.
     reminder_24h_client_sent: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
