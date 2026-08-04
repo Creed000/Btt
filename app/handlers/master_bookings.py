@@ -8,6 +8,9 @@ from app.keyboards.main import main_menu
 from app.models.booking import Booking
 from app.models.master import Master
 from app.models.user import User
+from app.services.booking_notifications import (
+    notify_client_about_status,
+)
 
 
 STATUS_NAMES = {
@@ -210,7 +213,13 @@ async def change_master_booking_status(
             return
 
         booking = db.scalar(
-            select(Booking).where(
+            select(Booking)
+            .options(
+                joinedload(Booking.client),
+                joinedload(Booking.service),
+                joinedload(Booking.master).joinedload(Master.user),
+            )
+            .where(
                 Booking.id == booking_id,
                 Booking.master_id == master.id,
             )
@@ -242,6 +251,13 @@ async def change_master_booking_status(
 
         booking.status = new_status
         db.commit()
+
+        db.expunge_all()
+
+        await notify_client_about_status(
+            context.application,
+            booking,
+        )
 
         result_messages = {
             "confirmed": f"✅ Запись #{booking_id} подтверждена.",
