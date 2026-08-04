@@ -108,3 +108,10 @@ class Master(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    days_off = relationship(
+        "MasterDayOff",
+        back_populates="master",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
