@@ -9,6 +9,7 @@ from app.models.category import Category
 from app.models.master import Master
 from app.models.service import Service
 from app.models.user import User
+from app.services.subscription_access import salon_has_active_access
 
 
 CATEGORY_BUTTONS = {
@@ -299,17 +300,90 @@ async def toggle_master_booking(
     db = SessionLocal()
 
     try:
-        master = get_current_master(
-            db,
-            update.effective_user.id,
+        user = db.scalar(
+            select(User).where(
+                User.telegram_id == update.effective_user.id
+            )
+        )
+
+        if user is None or not user.is_active:
+            await update.message.reply_text(
+                "❌ Аккаунт пользователя не найден или отключён.",
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
+            )
+            return
+
+        master = db.scalar(
+            select(Master)
+            .options(
+                joinedload(Master.salon),
+            )
+            .where(
+                Master.user_id == user.id
+            )
         )
 
         if master is None:
             await update.message.reply_text(
                 "❌ Профиль мастера не найден.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(
+                    role=user.role,
+                    telegram_id=user.telegram_id,
+                ),
             )
             return
+
+        if enabled:
+            problems: list[str] = []
+
+            if not master.is_verified:
+                problems.append(
+                    "профиль ещё не подтверждён администратором"
+                )
+
+            if master.city_id is None:
+                problems.append(
+                    "не выбран город"
+                )
+
+            service_exists = db.scalar(
+                select(Service.id)
+                .where(
+                    Service.master_id == master.id
+                )
+                .limit(1)
+            )
+
+            if service_exists is None:
+                problems.append(
+                    "не добавлена ни одна услуга"
+                )
+
+            if master.salon is not None:
+                allowed, reason = salon_has_active_access(
+                    master.salon
+                )
+
+                if not allowed:
+                    problems.append(reason)
+
+            if problems:
+                problem_text = "\n".join(
+                    f"• {problem}"
+                    for problem in problems
+                )
+
+                await update.message.reply_text(
+                    "❌ Нельзя включить приём записей.\n\n"
+                    "Сначала исправьте:\n"
+                    f"{problem_text}",
+                    reply_markup=master_actions_menu(
+                        master.booking_enabled
+                    ),
+                )
+                return
 
         master.booking_enabled = enabled
         db.commit()
@@ -333,7 +407,9 @@ async def toggle_master_booking(
 
         await update.message.reply_text(
             "❌ Не удалось изменить статус записи.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
