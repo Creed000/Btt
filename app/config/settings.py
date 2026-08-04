@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     REDIS_URL: str | None = None
-    SECRET_KEY: str = "change-me-before-production"
+    SECRET_KEY: str | None = None
 
     DEBUG: bool = False
     APP_TIMEZONE: str = "Asia/Bishkek"
@@ -103,9 +103,15 @@ class Settings(BaseSettings):
     @classmethod
     def validate_secret_key(
         cls,
-        value: str,
-    ) -> str:
+        value: str | None,
+    ) -> str | None:
+        if value is None:
+            return None
+
         value = value.strip()
+
+        if not value:
+            return None
 
         if len(value) < 16:
             raise ValueError(
