@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.models.salon import Salon
+from app.services.timezone import local_naive_now
 
 
 ACTIVE_SUBSCRIPTION_STATUSES = {
@@ -17,7 +18,7 @@ def refresh_subscription_status(
 
     Сохранение в базу выполняет вызывающий код через db.commit().
     """
-    now = datetime.utcnow()
+    now = local_naive_now()
 
     if (
         salon.subscription_status == "trial"
@@ -54,7 +55,7 @@ def salon_has_active_access(
             ),
         )
 
-    now = datetime.utcnow()
+    now = local_naive_now()
 
     if (
         salon.subscription_status == "trial"
