@@ -23,11 +23,10 @@ def _booking_datetime(
     )
 
 
-async def _send_reminder(
-    application: Application,
+def _reminder_texts(
     booking: Booking,
     reminder_title: str,
-) -> bool:
+) -> tuple[str, str]:
     client = booking.client
     master_user = (
         booking.master.user
@@ -60,51 +59,145 @@ async def _send_reminder(
         "%H:%M"
     )
 
-    delivered = False
+    client_text = (
+        f"⏰ {reminder_title}\n\n"
+        f"Запись #{booking.id}\n"
+        f"Услуга: {service_title}\n"
+        f"Мастер: {master_name}\n"
+        f"Дата: {date_text}\n"
+        f"Время: {time_text}"
+    )
 
-    if client is not None:
-        try:
-            await application.bot.send_message(
-                chat_id=client.telegram_id,
-                text=(
-                    f"⏰ {reminder_title}\n\n"
-                    f"Запись #{booking.id}\n"
-                    f"Услуга: {service_title}\n"
-                    f"Мастер: {master_name}\n"
-                    f"Дата: {date_text}\n"
-                    f"Время: {time_text}"
-                ),
-            )
-            delivered = True
-        except Exception:
-            logger.exception(
-                "Не удалось отправить напоминание клиенту "
-                "по записи %s",
-                booking.id,
-            )
+    master_text = (
+        f"⏰ {reminder_title}\n\n"
+        f"Запись #{booking.id}\n"
+        f"Клиент: {client_name}\n"
+        f"Услуга: {service_title}\n"
+        f"Дата: {date_text}\n"
+        f"Время: {time_text}"
+    )
 
-    if master_user is not None:
-        try:
-            await application.bot.send_message(
-                chat_id=master_user.telegram_id,
-                text=(
-                    f"⏰ {reminder_title}\n\n"
-                    f"Запись #{booking.id}\n"
-                    f"Клиент: {client_name}\n"
-                    f"Услуга: {service_title}\n"
-                    f"Дата: {date_text}\n"
-                    f"Время: {time_text}"
-                ),
-            )
-            delivered = True
-        except Exception:
-            logger.exception(
-                "Не удалось отправить напоминание мастеру "
-                "по записи %s",
-                booking.id,
-            )
+    return client_text, master_text
 
-    return delivered
+
+async def _send_to_client(
+    application: Application,
+    booking: Booking,
+    text: str,
+) -> bool:
+    if booking.client is None:
+        return True
+
+    try:
+        await application.bot.send_message(
+            chat_id=booking.client.telegram_id,
+            text=text,
+        )
+        return True
+    except Exception:
+        logger.exception(
+            "Не удалось отправить напоминание клиенту "
+            "по записи %s",
+            booking.id,
+        )
+        return False
+
+
+async def _send_to_master(
+    application: Application,
+    booking: Booking,
+    text: str,
+) -> bool:
+    master_user = (
+        booking.master.user
+        if booking.master and booking.master.user
+        else None
+    )
+
+    if master_user is None:
+        return True
+
+    try:
+        await application.bot.send_message(
+            chat_id=master_user.telegram_id,
+            text=text,
+        )
+        return True
+    except Exception:
+        logger.exception(
+            "Не удалось отправить напоминание мастеру "
+            "по записи %s",
+            booking.id,
+        )
+        return False
+
+
+async def _process_reminder_period(
+    application: Application,
+    booking: Booking,
+    reminder_title: str,
+    common_flag_name: str,
+    client_flag_name: str,
+    master_flag_name: str,
+) -> bool:
+    """
+    Возвращает True, если состояние записи изменилось.
+    """
+    changed = False
+
+    # Совместимость со старыми данными:
+    # если общий флаг уже был установлен, не отправляем напоминание повторно.
+    if getattr(booking, common_flag_name):
+        if not getattr(booking, client_flag_name):
+            setattr(booking, client_flag_name, True)
+            changed = True
+
+        if not getattr(booking, master_flag_name):
+            setattr(booking, master_flag_name, True)
+            changed = True
+
+        return changed
+
+    client_text, master_text = _reminder_texts(
+        booking,
+        reminder_title,
+    )
+
+    if not getattr(booking, client_flag_name):
+        delivered = await _send_to_client(
+            application,
+            booking,
+            client_text,
+        )
+
+        if delivered:
+            setattr(booking, client_flag_name, True)
+            changed = True
+
+    if not getattr(booking, master_flag_name):
+        delivered = await _send_to_master(
+            application,
+            booking,
+            master_text,
+        )
+
+        if delivered:
+            setattr(booking, master_flag_name, True)
+            changed = True
+
+    all_delivered = (
+        getattr(booking, client_flag_name)
+        and getattr(booking, master_flag_name)
+    )
+
+    if all_delivered and not getattr(
+        booking,
+        common_flag_name,
+    ):
+        setattr(booking, common_flag_name, True)
+        changed = True
+
+    return changed
 
 
 async def process_booking_reminders(
@@ -113,7 +206,9 @@ async def process_booking_reminders(
     """
     Проверяет подтверждённые записи и отправляет напоминания.
 
-    Функцию безопасно запускать каждые 5–10 минут.
+    Проверку безопасно запускать каждые 5 минут.
+    Неудачная доставка одному получателю не блокирует
+    повторную попытку именно для него.
     """
     db = SessionLocal()
 
@@ -154,41 +249,50 @@ async def process_booking_reminders(
             if time_left.total_seconds() <= 0:
                 continue
 
-            # Напоминание за 24 часа:
-            # отправляется в окне от 23 до 25 часов до записи.
+            changed = False
+
+            # Окно напоминания примерно за 24 часа.
             if (
-                not booking.reminder_24h_sent
-                and timedelta(hours=23)
+                timedelta(hours=23)
                 <= time_left
                 <= timedelta(hours=25)
             ):
-                delivered = await _send_reminder(
-                    application,
-                    booking,
-                    "Напоминание: запись примерно через 24 часа",
+                changed = (
+                    await _process_reminder_period(
+                        application=application,
+                        booking=booking,
+                        reminder_title=(
+                            "Напоминание: запись примерно через 24 часа"
+                        ),
+                        common_flag_name="reminder_24h_sent",
+                        client_flag_name="reminder_24h_client_sent",
+                        master_flag_name="reminder_24h_master_sent",
+                    )
+                    or changed
                 )
 
-                if delivered:
-                    booking.reminder_24h_sent = True
-                    db.commit()
-
-            # Напоминание за 2 часа:
-            # отправляется в окне от 1 ч 30 мин до 2 ч 30 мин.
+            # Окно напоминания примерно за 2 часа.
             if (
-                not booking.reminder_2h_sent
-                and timedelta(minutes=90)
+                timedelta(minutes=90)
                 <= time_left
                 <= timedelta(minutes=150)
             ):
-                delivered = await _send_reminder(
-                    application,
-                    booking,
-                    "Напоминание: запись примерно через 2 часа",
+                changed = (
+                    await _process_reminder_period(
+                        application=application,
+                        booking=booking,
+                        reminder_title=(
+                            "Напоминание: запись примерно через 2 часа"
+                        ),
+                        common_flag_name="reminder_2h_sent",
+                        client_flag_name="reminder_2h_client_sent",
+                        master_flag_name="reminder_2h_master_sent",
+                    )
+                    or changed
                 )
 
-                if delivered:
-                    booking.reminder_2h_sent = True
-                    db.commit()
+            if changed:
+                db.commit()
 
     except Exception:
         db.rollback()
