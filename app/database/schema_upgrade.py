@@ -354,6 +354,70 @@ def upgrade_database_schema() -> None:
                 ),
             )
 
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_24h_client_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_client_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_client_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_24h_master_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_master_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_24h_master_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_2h_client_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_client_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_client_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
+            add_column_if_missing(
+                "bookings",
+                booking_columns,
+                "reminder_2h_master_sent",
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_master_sent BOOLEAN "
+                    "NOT NULL DEFAULT FALSE"
+                ),
+                (
+                    "ALTER TABLE bookings "
+                    "ADD COLUMN reminder_2h_master_sent BOOLEAN "
+                    "NOT NULL DEFAULT 0"
+                ),
+            )
+
             # Для старых записей явно сохраняем значение false.
             connection.execute(
                 text(
@@ -371,6 +435,46 @@ def upgrade_database_schema() -> None:
                     UPDATE bookings
                     SET reminder_2h_sent = FALSE
                     WHERE reminder_2h_sent IS NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_24h_client_sent = FALSE
+                    WHERE reminder_24h_client_sent IS NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_24h_master_sent = FALSE
+                    WHERE reminder_24h_master_sent IS NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_2h_client_sent = FALSE
+                    WHERE reminder_2h_client_sent IS NULL
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE bookings
+                    SET reminder_2h_master_sent = FALSE
+                    WHERE reminder_2h_master_sent IS NULL
                     """
                 )
             )
@@ -429,6 +533,42 @@ def upgrade_database_schema() -> None:
                     """
                     CREATE INDEX IF NOT EXISTS ix_bookings_reminder_2h
                     ON bookings (reminder_2h_sent)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_24h_client
+                    ON bookings (reminder_24h_client_sent)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_24h_master
+                    ON bookings (reminder_24h_master_sent)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_2h_client
+                    ON bookings (reminder_2h_client_sent)
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_bookings_reminder_2h_master
+                    ON bookings (reminder_2h_master_sent)
                     """
                 )
             )
