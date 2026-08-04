@@ -20,6 +20,7 @@ def master_panel_menu(master: Master) -> ReplyKeyboardMarkup:
         [KeyboardButton("📅 Мои записи")],
         [KeyboardButton("🗓 Моё расписание")],
         [KeyboardButton("🏖 Выходные даты")],
+        [KeyboardButton("⏸ Блокировки времени")],
         [KeyboardButton("➕ Добавить услугу")],
         [KeyboardButton("📋 Мои услуги")],
         [KeyboardButton("🏙 Мой город")],
