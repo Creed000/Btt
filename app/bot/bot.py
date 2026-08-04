@@ -14,6 +14,7 @@ from app.handlers.profile import profile_handler
 from app.handlers.search import search_handler
 from app.handlers.settings import settings_handler
 from app.handlers.start import start_handler
+from app.handlers.telegram_id import telegram_id_handler
 from app.services.booking_reminders import (
     process_booking_reminders,
 )
@@ -116,8 +117,11 @@ application = (
 )
 
 
-# Регистрация обработчиков.
+# Регистрация обработчиков команд.
 application.add_handler(start_handler)
+application.add_handler(telegram_id_handler)
+
+# Регистрация остальных обработчиков.
 application.add_handler(menu_handler)
 application.add_handler(booking_handler)
 application.add_handler(profile_handler)
