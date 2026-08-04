@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import CommandHandler, ContextTypes
 
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
@@ -50,3 +50,9 @@ async def start(
 
     finally:
         db.close()
+
+
+start_handler = CommandHandler(
+    "start",
+    start,
+)
