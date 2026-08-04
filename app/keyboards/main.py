@@ -22,7 +22,7 @@ def main_menu(
         ],
     ]
 
-    # Роль owner означает владельца конкретного салона.
+    # owner — владелец конкретного салона.
     if role == "owner":
         keyboard.append(
             [KeyboardButton("🏢 Кабинет салона")]
@@ -32,11 +32,20 @@ def main_menu(
             [KeyboardButton("🏢 Создать салон")]
         )
 
-    # Админ-панель показываем только ID из настроек Railway.
-    if (
-        telegram_id is not None
-        and is_platform_admin(telegram_id)
-    ):
+    # Показываем кнопку системному admin.
+    # Если Telegram ID передан, дополнительно проверяем настройки Railway.
+    #
+    # Сам доступ всё равно защищён внутри admin_panel.py через
+    # can_manage_platform(), поэтому ручной ввод текста не даст прав.
+    has_admin_button = (
+        role == "admin"
+        or (
+            telegram_id is not None
+            and is_platform_admin(telegram_id)
+        )
+    )
+
+    if has_admin_button:
         keyboard.append(
             [KeyboardButton("👑 Админ-панель")]
         )
