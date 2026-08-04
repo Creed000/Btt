@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     APP_TIMEZONE: str = "Asia/Bishkek"
 
-    # Telegram ID главного владельца SaaS.
+    # Telegram ID главного владельца SaaS-платформы.
     OWNER_TELEGRAM_ID: int | None = None
 
     # Дополнительные администраторы через запятую:
@@ -49,11 +49,16 @@ class Settings(BaseSettings):
         self,
         telegram_id: int,
     ) -> str | None:
+        # В базе и главный владелец платформы, и дополнительные
+        # администраторы имеют роль admin.
+        #
+        # Расширенные права главного владельца определяются отдельно
+        # через OWNER_TELEGRAM_ID в access_control.py.
         if (
             self.OWNER_TELEGRAM_ID is not None
             and telegram_id == self.OWNER_TELEGRAM_ID
         ):
-            return "owner"
+            return "admin"
 
         if telegram_id in self.admin_telegram_ids:
             return "admin"
