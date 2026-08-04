@@ -1,5 +1,7 @@
 import logging
+import traceback
 
+from telegram import Update
 from telegram.ext import (
     Application,
     ContextTypes,
@@ -40,11 +42,10 @@ async def post_init(
     if application.job_queue is None:
         logger.error(
             "JobQueue недоступен. "
-            "Проверьте установку APScheduler."
+            "Проверьте установку python-telegram-bot[job-queue]."
         )
         return
 
-    # Защита от повторного добавления задачи.
     existing_jobs = application.job_queue.get_jobs_by_name(
         "booking_reminders"
     )
@@ -68,6 +69,45 @@ async def post_init(
     )
 
 
+async def global_error_handler(
+    update: object,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """
+    Логирует любую необработанную ошибку Telegram-бота.
+    """
+    error_text = "".join(
+        traceback.format_exception(
+            type(context.error),
+            context.error,
+            context.error.__traceback__,
+        )
+    )
+
+    logger.error(
+        "Необработанная ошибка Telegram-бота:\n%s",
+        error_text,
+    )
+
+    if not isinstance(update, Update):
+        return
+
+    message = update.effective_message
+
+    if message is None:
+        return
+
+    try:
+        await message.reply_text(
+            "❌ Произошла непредвиденная ошибка.\n\n"
+            "Попробуйте ещё раз или отправьте /start."
+        )
+    except Exception:
+        logger.exception(
+            "Не удалось отправить пользователю сообщение об ошибке."
+        )
+
+
 application = (
     Application.builder()
     .token(settings.BOT_TOKEN)
@@ -83,3 +123,8 @@ application.add_handler(booking_handler)
 application.add_handler(profile_handler)
 application.add_handler(search_handler)
 application.add_handler(settings_handler)
+
+# Глобальный обработчик непредвиденных ошибок.
+application.add_error_handler(
+    global_error_handler
+)
