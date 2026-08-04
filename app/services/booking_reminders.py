@@ -8,6 +8,7 @@ from telegram.ext import Application
 from app.database.session import SessionLocal
 from app.models.booking import Booking
 from app.models.master import Master
+from app.services.timezone import local_naive_now
 
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ async def process_booking_reminders(
     db = SessionLocal()
 
     try:
-        now = datetime.now()
+        now = local_naive_now()
         search_until = now + timedelta(
             hours=25,
         )
