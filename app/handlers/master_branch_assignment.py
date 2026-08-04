@@ -163,9 +163,7 @@ async def begin_branch_assignment(
         context.user_data["branch_assignment"] = "master"
 
         await update.message.reply_text(
-            "🏬 Назначение филиала мастеру
-
-"
+            "🏬 Назначение филиала мастеру\n\n"
             "Шаг 1 из 2. Выберите мастера:",
             reply_markup=masters_for_branch_menu(masters),
         )
@@ -399,11 +397,8 @@ async def process_branch_assignment(
         clear_branch_assignment(context)
 
         await update.message.reply_text(
-            "✅ Филиал назначен!
-
-"
-            f"Мастер: {master_name}
-"
+            "✅ Филиал назначен!\n\n"
+            f"Мастер: {master_name}\n"
             f"Филиал: {branch_name}",
             reply_markup=main_menu(role="owner"),
         )
