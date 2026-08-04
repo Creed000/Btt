@@ -763,12 +763,15 @@ async def menu(
 
     # Запись клиента.
     if text in CITY_BUTTONS:
-        context.user_data["city"] = CITY_BUTTONS[text]
+        selected_city = CITY_BUTTONS[text]
+        context.user_data["city"] = selected_city
 
         await update.message.reply_text(
-            f"✅ Город: {CITY_BUTTONS[text]}\n\n"
+            f"✅ Город: {selected_city}\n\n"
             "📂 Теперь выберите категорию.",
-            reply_markup=category_menu(),
+            reply_markup=category_menu(
+                city_name=selected_city,
+            ),
         )
         return
 
