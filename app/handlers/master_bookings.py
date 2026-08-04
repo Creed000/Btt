@@ -33,6 +33,22 @@ def booking_starts_at(
     )
 
 
+def booking_ends_at(
+    booking: Booking,
+) -> datetime:
+    duration = (
+        booking.service.duration
+        if booking.service is not None
+        else 30
+    )
+
+    from datetime import timedelta
+
+    return booking_starts_at(
+        booking
+    ) + timedelta(minutes=duration)
+
+
 def master_bookings_menu(
     bookings: list[Booking],
 ) -> ReplyKeyboardMarkup:
@@ -64,7 +80,11 @@ def master_bookings_menu(
             )
 
         elif booking.status == "confirmed":
-            if starts_at <= now:
+            ends_at = booking_ends_at(
+                booking
+            )
+
+            if ends_at <= now:
                 keyboard.append(
                     [
                         KeyboardButton(
@@ -72,7 +92,7 @@ def master_bookings_menu(
                         )
                     ]
                 )
-            else:
+            elif starts_at > now:
                 keyboard.append(
                     [
                         KeyboardButton(
@@ -314,17 +334,19 @@ async def change_master_booking_status(
             )
             return
 
-        if (
-            new_status == "completed"
-            and starts_at > now
-        ):
-            await update.message.reply_text(
-                "❌ Нельзя завершить запись до времени её начала.",
-                reply_markup=main_menu(
-                    telegram_id=update.effective_user.id,
-                ),
+        if new_status == "completed":
+            ends_at = booking_ends_at(
+                booking
             )
-            return
+
+            if ends_at > now:
+                await update.message.reply_text(
+                    "❌ Нельзя завершить запись до окончания услуги.",
+                    reply_markup=main_menu(
+                        telegram_id=update.effective_user.id,
+                    ),
+                )
+                return
 
         booking.status = new_status
         db.commit()
