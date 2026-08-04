@@ -4,6 +4,7 @@ from .category import Category
 from .city import City
 from .client import Client
 from .master import Master
+from .master_day_off import MasterDayOff
 from .master_schedule import MasterSchedule
 from .role import Role
 from .salon import Salon
@@ -20,6 +21,7 @@ __all__ = [
     "Branch",
     "Master",
     "MasterSchedule",
+    "MasterDayOff",
     "Client",
     "Service",
     "Booking",
