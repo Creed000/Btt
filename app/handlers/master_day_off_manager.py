@@ -10,6 +10,7 @@ from app.models.booking import Booking
 from app.models.master import Master
 from app.models.master_day_off import MasterDayOff
 from app.models.user import User
+from app.services.timezone import local_today
 
 
 ACTIVE_BOOKING_STATUSES = {
@@ -184,7 +185,7 @@ async def process_day_off_creation(
         )
         return True
 
-    if selected_date < date.today():
+    if selected_date < local_today():
         await update.message.reply_text(
             "Нельзя добавить прошедшую дату."
         )
@@ -307,7 +308,7 @@ async def show_master_days_off(
                 select(MasterDayOff)
                 .where(
                     MasterDayOff.master_id == master.id,
-                    MasterDayOff.day_off_date >= date.today(),
+                    MasterDayOff.day_off_date >= local_today(),
                 )
                 .order_by(MasterDayOff.day_off_date)
             ).all()
