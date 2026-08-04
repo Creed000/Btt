@@ -8,6 +8,7 @@ from app.models.booking import Booking
 from app.models.master import Master
 from app.models.service import Service
 from app.models.user import User
+from app.services.access_control import can_manage_platform
 
 
 def admin_menu() -> ReplyKeyboardMarkup:
@@ -42,17 +43,15 @@ async def open_admin_panel(
             )
         )
 
-        if user is None:
-            await update.message.reply_text(
-                "❌ Пользователь не найден. Отправьте /start.",
-                reply_markup=main_menu(),
-            )
-            return
+        if not can_manage_platform(user):
+            role = user.role if user is not None else None
 
-        if user.role not in {"admin", "owner"}:
             await update.message.reply_text(
-                "⛔ У вас нет доступа к админ-панели.",
-                reply_markup=main_menu(role=user.role),
+                "⛔ У вас нет доступа к админ-панели SaaS.",
+                reply_markup=main_menu(
+                    role=role,
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
@@ -97,7 +96,7 @@ async def open_admin_panel(
         ) or 0
 
         await update.message.reply_text(
-            "👑 Админ-панель BTT\n\n"
+            "👑 Админ-панель SaaS\n\n"
             f"👥 Пользователей: {users_count}\n"
             f"✅ Активных пользователей: {active_users_count}\n"
             f"🧑‍💼 Мастеров: {masters_count}\n"
@@ -112,7 +111,9 @@ async def open_admin_panel(
     except Exception:
         await update.message.reply_text(
             "❌ Не удалось открыть админ-панель.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
