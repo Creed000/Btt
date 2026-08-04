@@ -14,6 +14,25 @@ from app.services.timezone import APP_TIMEZONE, local_naive_now
 logger = logging.getLogger(__name__)
 
 
+def get_job_status(
+    context: ContextTypes.DEFAULT_TYPE,
+    job_name: str,
+) -> str:
+    job_queue = context.application.job_queue
+
+    if job_queue is None:
+        return "❌ JobQueue недоступна"
+
+    jobs = job_queue.get_jobs_by_name(
+        job_name
+    )
+
+    if not jobs:
+        return "❌ задача не найдена"
+
+    return "✅ активна"
+
+
 async def health_check(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -31,7 +50,11 @@ async def health_check(
         )
 
         if not can_manage_platform(user):
-            role = user.role if user is not None else None
+            role = (
+                user.role
+                if user is not None
+                else None
+            )
 
             await update.message.reply_text(
                 "⛔ Команда /health доступна только "
@@ -61,27 +84,40 @@ async def health_check(
             else "❌ недоступна"
         )
 
-        reminder_job_status = "❌ не найдена"
+        reminder_job_status = get_job_status(
+            context,
+            "booking_reminders",
+        )
 
-        if context.application.job_queue is not None:
-            jobs = context.application.job_queue.get_jobs_by_name(
-                "booking_reminders"
-            )
-
-            if jobs:
-                reminder_job_status = "✅ активна"
+        subscription_job_status = get_job_status(
+            context,
+            "subscription_maintenance",
+        )
 
         now = local_naive_now()
 
         await update.message.reply_text(
             "🩺 Состояние системы\n\n"
-            f"Telegram-бот: ✅ работает\n"
+            "Telegram-бот: ✅ работает\n"
             f"PostgreSQL: {database_status}\n"
             f"JobQueue: {job_queue_status}\n"
             f"Напоминания: {reminder_job_status}\n"
+            f"Проверка подписок: {subscription_job_status}\n"
             f"Часовой пояс: {APP_TIMEZONE}\n"
             f"Локальное время: "
             f"{now.strftime('%d.%m.%Y %H:%M:%S')}"
+        )
+
+    except Exception:
+        logger.exception(
+            "Ошибка выполнения команды /health"
+        )
+
+        await update.message.reply_text(
+            "❌ Не удалось выполнить проверку состояния системы.",
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
