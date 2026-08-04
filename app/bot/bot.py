@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import traceback
 
@@ -15,6 +16,9 @@ from app.handlers.telegram_id import telegram_id_handler
 from app.services.booking_reminders import (
     process_booking_reminders,
 )
+from app.services.subscription_maintenance import (
+    process_expired_salon_access,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -24,11 +28,41 @@ async def booking_reminders_job(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     """
-    Периодическая задача проверки напоминаний.
+    Проверяет ближайшие записи и отправляет напоминания.
     """
     await process_booking_reminders(
         context.application,
     )
+
+
+async def subscription_maintenance_job(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """
+    Проверяет пробные периоды и подписки салонов.
+
+    Синхронная работа с SQLAlchemy выполняется в отдельном потоке,
+    чтобы не блокировать обработку сообщений Telegram.
+    """
+    try:
+        result = await asyncio.to_thread(
+            process_expired_salon_access
+        )
+
+        logger.info(
+            "Проверка подписок завершена: "
+            "салонов проверено=%s, "
+            "просрочено=%s, "
+            "мастеров отключено=%s",
+            result["checked_salons"],
+            result["expired_salons"],
+            result["disabled_masters"],
+        )
+
+    except Exception:
+        logger.exception(
+            "Ошибка фоновой проверки подписок салонов"
+        )
 
 
 async def post_init(
@@ -65,27 +99,33 @@ async def post_init(
         )
         return
 
-    existing_jobs = application.job_queue.get_jobs_by_name(
+    if not application.job_queue.get_jobs_by_name(
         "booking_reminders"
-    )
-
-    if existing_jobs:
-        logger.info(
-            "Задача напоминаний уже зарегистрирована."
+    ):
+        application.job_queue.run_repeating(
+            callback=booking_reminders_job,
+            interval=300,
+            first=30,
+            name="booking_reminders",
         )
-        return
 
-    application.job_queue.run_repeating(
-        callback=booking_reminders_job,
-        interval=300,
-        first=30,
-        name="booking_reminders",
-    )
+        logger.info(
+            "Напоминания запущены: проверка каждые 5 минут."
+        )
 
-    logger.info(
-        "Автоматические напоминания запущены: "
-        "проверка каждые 5 минут."
-    )
+    if not application.job_queue.get_jobs_by_name(
+        "subscription_maintenance"
+    ):
+        application.job_queue.run_repeating(
+            callback=subscription_maintenance_job,
+            interval=3600,
+            first=60,
+            name="subscription_maintenance",
+        )
+
+        logger.info(
+            "Проверка подписок запущена: каждый час."
+        )
 
 
 async def global_error_handler(
