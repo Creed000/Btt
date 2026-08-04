@@ -1,7 +1,6 @@
 import logging
 
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 
 from app.database.session import SessionLocal
 from app.models.salon import Salon
@@ -15,32 +14,30 @@ logger = logging.getLogger(__name__)
 
 def process_expired_salon_access() -> dict[str, int]:
     """
-    Проверяет все активные салоны и синхронизирует доступ к записи.
+    Проверяет все салоны и синхронизирует доступ к записи.
 
-    Если пробный период или подписка закончились:
-    - статус подписки обновляется через salon_has_active_access();
-    - приём записей выключается у всех мастеров салона.
+    Обрабатываются:
+    - активные подписки;
+    - пробные периоды;
+    - просроченные подписки;
+    - отменённые подписки;
+    - отключённые салоны.
 
-    Возвращает статистику выполнения.
+    Если доступ недействителен, приём записей выключается
+    у всех мастеров соответствующего салона.
     """
     db = SessionLocal()
 
     checked_salons = 0
-    expired_salons = 0
+    blocked_salons = 0
     disabled_masters = 0
 
     try:
         salons = list(
             db.scalars(
                 select(Salon)
-                .options(
-                    joinedload(Salon.owner)
-                )
-                .where(
-                    Salon.is_active.is_(True)
-                )
                 .order_by(Salon.id)
-            ).unique().all()
+            ).all()
         )
 
         for salon in salons:
@@ -54,11 +51,11 @@ def process_expired_salon_access() -> dict[str, int]:
             )
 
             if not allowed:
-                expired_salons += 1
+                blocked_salons += 1
                 disabled_masters += disabled_count
 
                 logger.info(
-                    "Доступ салона #%s отключён: %s. "
+                    "Доступ салона #%s ограничен: %s. "
                     "Отключено мастеров: %s",
                     salon.id,
                     reason,
@@ -69,7 +66,7 @@ def process_expired_salon_access() -> dict[str, int]:
 
         return {
             "checked_salons": checked_salons,
-            "expired_salons": expired_salons,
+            "expired_salons": blocked_salons,
             "disabled_masters": disabled_masters,
         }
 
