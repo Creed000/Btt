@@ -8,6 +8,7 @@ from app.models.branch import Branch
 from app.models.master import Master
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.access_control import is_platform_admin
 from app.services.subscription_access import require_active_salon_access
 from app.services.subscription_limits import can_add_master
 
@@ -125,7 +126,9 @@ async def process_master_invite(
 
         await update.message.reply_text(
             "❌ Приглашение мастера отменено.",
-            reply_markup=main_menu(role="owner"),
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
         return True
 
@@ -204,7 +207,7 @@ async def process_master_invite(
                     description="Мастер салона",
                     slug=f"master-{invited_user.telegram_id}",
                     rating=5.0,
-                    booking_enabled=True,
+                    booking_enabled=False,
                     is_verified=False,
                 )
                 db.add(master)
@@ -220,7 +223,7 @@ async def process_master_invite(
                     )
 
                 master.salon_id = salon.id
-                master.booking_enabled = True
+                master.booking_enabled = False
 
             main_branch = db.scalar(
                 select(Branch)
@@ -231,7 +234,13 @@ async def process_master_invite(
             if main_branch is not None:
                 master.branch_id = main_branch.id
 
-            invited_user.role = "master"
+            # Не перезаписываем системного администратора
+            # или владельца собственного салона.
+            if (
+                not is_platform_admin(invited_user.telegram_id)
+                and invited_user.role != "owner"
+            ):
+                invited_user.role = "master"
 
             db.add(invited_user)
             db.add(master)
@@ -252,7 +261,11 @@ async def process_master_invite(
 
             await update.message.reply_text(
                 f"❌ {error}",
-                reply_markup=main_menu(role="owner"),
+                reply_markup=main_menu(
+                role=owner.role,
+                telegram_id=owner.telegram_id,
+                has_salon=True,
+            ),
             )
             return True
 
@@ -262,7 +275,11 @@ async def process_master_invite(
 
             await update.message.reply_text(
                 "❌ Не удалось добавить мастера.",
-                reply_markup=main_menu(role="owner"),
+                reply_markup=main_menu(
+                role=owner.role,
+                telegram_id=owner.telegram_id,
+                has_salon=True,
+            ),
             )
             return True
 
@@ -276,7 +293,11 @@ async def process_master_invite(
             f"ID мастера: {master_id}\n"
             f"Имя: {master_name}\n"
             f"Филиал: {branch_name}",
-            reply_markup=main_menu(role="owner"),
+            reply_markup=main_menu(
+                role=owner.role,
+                telegram_id=owner.telegram_id,
+                has_salon=True,
+            ),
         )
         return True
 
