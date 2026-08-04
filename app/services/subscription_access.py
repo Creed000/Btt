@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from app.models.salon import Salon
 from app.services.timezone import local_naive_now
 
@@ -20,31 +18,48 @@ def refresh_subscription_status(
     """
     now = local_naive_now()
 
-    if (
-        salon.subscription_status == "trial"
-        and salon.trial_ends_at is not None
-        and salon.trial_ends_at <= now
-    ):
-        salon.subscription_status = "expired"
+    if salon.subscription_status == "trial":
+        if (
+            salon.trial_ends_at is None
+            or salon.trial_ends_at <= now
+        ):
+            salon.subscription_status = "expired"
 
-    if (
-        salon.subscription_status == "active"
-        and salon.subscription_ends_at is not None
-        and salon.subscription_ends_at <= now
-    ):
-        salon.subscription_status = "expired"
+    elif salon.subscription_status == "active":
+        if (
+            salon.subscription_ends_at is None
+            or salon.subscription_ends_at <= now
+        ):
+            salon.subscription_status = "expired"
 
 
 def salon_has_active_access(
     salon: Salon,
 ) -> tuple[bool, str]:
-    refresh_subscription_status(salon)
+    original_status = salon.subscription_status
+
+    refresh_subscription_status(
+        salon
+    )
 
     if not salon.is_active:
         return (
             False,
             "Салон временно отключён.",
         )
+
+    if salon.subscription_status == "expired":
+        if original_status == "trial":
+            return (
+                False,
+                "Пробный период завершён или не настроен.",
+            )
+
+        if original_status == "active":
+            return (
+                False,
+                "Срок подписки завершён или не настроен.",
+            )
 
     if salon.subscription_status not in ACTIVE_SUBSCRIPTION_STATUSES:
         return (
@@ -55,35 +70,15 @@ def salon_has_active_access(
             ),
         )
 
-    now = local_naive_now()
-
-    if (
-        salon.subscription_status == "trial"
-        and salon.trial_ends_at is not None
-        and salon.trial_ends_at <= now
-    ):
-        return (
-            False,
-            "Пробный период завершён.",
-        )
-
-    if (
-        salon.subscription_status == "active"
-        and salon.subscription_ends_at is not None
-        and salon.subscription_ends_at <= now
-    ):
-        return (
-            False,
-            "Срок подписки завершён.",
-        )
-
     return True, ""
 
 
 def require_active_salon_access(
     salon: Salon,
 ) -> None:
-    allowed, reason = salon_has_active_access(salon)
+    allowed, reason = salon_has_active_access(
+        salon
+    )
 
     if not allowed:
         raise ValueError(reason)
