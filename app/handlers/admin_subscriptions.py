@@ -11,6 +11,11 @@ from app.keyboards.main import main_menu
 from app.models.salon import Salon
 from app.models.user import User
 from app.services.access_control import can_manage_platform
+from app.services.subscription_limits import (
+    count_salon_branches,
+    count_salon_masters,
+    get_plan_limits,
+)
 from app.services.timezone import local_naive_now
 
 
@@ -121,6 +126,56 @@ async def deny_access(
     )
 
 
+def validate_plan_capacity(
+    db,
+    salon: Salon,
+    plan_code: str,
+) -> tuple[bool, str]:
+    limits = get_plan_limits(
+        plan_code
+    )
+
+    masters_count = count_salon_masters(
+        db,
+        salon.id,
+    )
+    branches_count = count_salon_branches(
+        db,
+        salon.id,
+    )
+
+    problems: list[str] = []
+
+    if masters_count > limits["masters"]:
+        problems.append(
+            f"мастеров: {masters_count}, "
+            f"доступно: {limits['masters']}"
+        )
+
+    if branches_count > limits["branches"]:
+        problems.append(
+            f"филиалов: {branches_count}, "
+            f"доступно: {limits['branches']}"
+        )
+
+    if not problems:
+        return True, ""
+
+    return (
+        False,
+        (
+            f"Нельзя активировать тариф {PLAN_TITLES[plan_code]}.\n\n"
+            "Текущие ресурсы превышают его лимиты:\n"
+            + "\n".join(
+                f"• {problem}"
+                for problem in problems
+            )
+            + "\n\nСначала уменьшите количество мастеров "
+            "или филиалов либо выберите более высокий тариф."
+        ),
+    )
+
+
 async def show_salons_for_subscription(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -162,13 +217,17 @@ async def show_salons_for_subscription(
                 )
 
                 end_date = (
-                    salon.subscription_ends_at.strftime("%d.%m.%Y %H:%M")
+                    salon.subscription_ends_at.strftime(
+                        "%d.%m.%Y %H:%M"
+                    )
                     if salon.subscription_ends_at
                     else "—"
                 )
 
                 trial_end = (
-                    salon.trial_ends_at.strftime("%d.%m.%Y %H:%M")
+                    salon.trial_ends_at.strftime(
+                        "%d.%m.%Y %H:%M"
+                    )
                     if salon.trial_ends_at
                     else "—"
                 )
@@ -189,7 +248,9 @@ async def show_salons_for_subscription(
 
         await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=salon_subscription_actions_menu(salons),
+            reply_markup=salon_subscription_actions_menu(
+                salons
+            ),
         )
 
     except Exception:
@@ -234,13 +295,29 @@ async def open_salon_subscription_control(
             )
             return
 
+        limits = get_plan_limits(
+            salon.plan
+        )
+        masters_count = count_salon_masters(
+            db,
+            salon.id,
+        )
+        branches_count = count_salon_branches(
+            db,
+            salon.id,
+        )
+
         await update.message.reply_text(
             "💳 Управление подпиской\n\n"
             f"Салон: {salon.name}\n"
             f"Текущий тариф: {salon.plan}\n"
-            f"Статус: {salon.subscription_status}\n\n"
+            f"Статус: {salon.subscription_status}\n"
+            f"Мастера: {masters_count}/{limits['masters']}\n"
+            f"Филиалы: {branches_count}/{limits['branches']}\n\n"
             "Выберите действие:",
-            reply_markup=salon_plan_menu(salon.id),
+            reply_markup=salon_plan_menu(
+                salon.id
+            ),
         )
 
     finally:
@@ -287,11 +364,28 @@ async def activate_salon_plan(
             )
             return
 
+        allowed, reason = validate_plan_capacity(
+            db,
+            salon,
+            plan_code,
+        )
+
+        if not allowed:
+            await update.message.reply_text(
+                f"⛔ {reason}",
+                reply_markup=salon_plan_menu(
+                    salon.id
+                ),
+            )
+            return
+
         now = local_naive_now()
 
         salon.plan = plan_code
         salon.subscription_status = "active"
-        salon.subscription_ends_at = now + timedelta(days=30)
+        salon.subscription_ends_at = (
+            now + timedelta(days=30)
+        )
         salon.is_active = True
         salon.updated_at = now
 
