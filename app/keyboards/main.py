@@ -6,6 +6,7 @@ from app.services.access_control import is_platform_admin
 def main_menu(
     role: str | None = None,
     telegram_id: int | None = None,
+    has_salon: bool | None = None,
 ) -> ReplyKeyboardMarkup:
     keyboard = [
         [
@@ -22,8 +23,15 @@ def main_menu(
         ],
     ]
 
-    # owner — владелец конкретного салона.
-    if role == "owner":
+    # Для старых вызовов без has_salon сохраняем совместимость:
+    # роль owner означает владельца салона.
+    owns_salon = (
+        has_salon
+        if has_salon is not None
+        else role == "owner"
+    )
+
+    if owns_salon:
         keyboard.append(
             [KeyboardButton("🏢 Кабинет салона")]
         )
@@ -32,11 +40,8 @@ def main_menu(
             [KeyboardButton("🏢 Создать салон")]
         )
 
-    # Показываем кнопку системному admin.
-    # Если Telegram ID передан, дополнительно проверяем настройки Railway.
-    #
-    # Сам доступ всё равно защищён внутри admin_panel.py через
-    # can_manage_platform(), поэтому ручной ввод текста не даст прав.
+    # Админ-панель показываем системным администраторам.
+    # Реальный доступ дополнительно проверяется внутри обработчиков.
     has_admin_button = (
         role == "admin"
         or (
