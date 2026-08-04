@@ -7,6 +7,7 @@ from app.keyboards.main import main_menu
 from app.models.branch import Branch
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.subscription_access import require_active_salon_access
 from app.services.subscription_limits import can_add_branch
 
 
@@ -74,6 +75,8 @@ async def begin_branch_creation(
                 reply_markup=main_menu(role=user.role),
             )
             return
+
+        require_active_salon_access(salon)
 
         allowed, reason = can_add_branch(
             db,
@@ -179,6 +182,8 @@ async def process_branch_creation(
                 raise ValueError(
                     "Активный салон не найден."
                 )
+
+            require_active_salon_access(salon)
 
             allowed, reason = can_add_branch(
                 db,
