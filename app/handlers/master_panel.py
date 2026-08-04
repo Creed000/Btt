@@ -18,6 +18,7 @@ def master_panel_menu(master: Master) -> ReplyKeyboardMarkup:
 
     keyboard = [
         [KeyboardButton("📅 Мои записи")],
+        [KeyboardButton("🗓 Моё расписание")],
         [KeyboardButton("➕ Добавить услугу")],
         [KeyboardButton("📋 Мои услуги")],
         [KeyboardButton("🏙 Мой город")],
@@ -59,7 +60,7 @@ async def become_master(
         if not user.is_active:
             await update.message.reply_text(
                 "❌ Ваш аккаунт временно отключён.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(role=user.role),
             )
             return
 
@@ -79,7 +80,8 @@ async def become_master(
                 is_verified=False,
             )
 
-            user.role = "master"
+            if user.role == "client":
+                user.role = "master"
 
             db.add(master)
             db.add(user)
@@ -88,8 +90,8 @@ async def become_master(
 
             await update.message.reply_text(
                 "🎉 Профиль мастера создан!\n\n"
-                "Теперь нажмите «🏙 Мой город» и выберите город, "
-                "в котором принимаете клиентов.",
+                "Теперь выберите город, добавьте услуги "
+                "и настройте рабочее расписание.",
                 reply_markup=master_panel_menu(master),
             )
             return
@@ -98,7 +100,7 @@ async def become_master(
             select(func.count(Service.id)).where(
                 Service.master_id == master.id
             )
-        )
+        ) or 0
 
         city_name = (
             master.city.name
@@ -106,16 +108,30 @@ async def become_master(
             else "не выбран"
         )
 
+        salon_name = (
+            master.salon.name
+            if master.salon
+            else "самостоятельный мастер"
+        )
+
+        branch_name = (
+            master.branch.name
+            if master.branch
+            else "не назначен"
+        )
+
         await update.message.reply_text(
             "💼 Кабинет мастера\n\n"
             f"🆔 ID мастера: {master.id}\n"
             f"⭐ Рейтинг: {master.rating:.1f}\n"
             f"🏙 Город: {city_name}\n"
+            f"🏢 Салон: {salon_name}\n"
+            f"🏬 Филиал: {branch_name}\n"
             f"📅 Приём записей: "
             f"{'включён' if master.booking_enabled else 'выключен'}\n"
             f"✅ Проверка профиля: "
             f"{'пройдена' if master.is_verified else 'ожидается'}\n"
-            f"💼 Услуг добавлено: {services_count or 0}",
+            f"💼 Услуг добавлено: {services_count}",
             reply_markup=master_panel_menu(master),
         )
 
