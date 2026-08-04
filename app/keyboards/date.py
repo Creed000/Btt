@@ -1,6 +1,8 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup
+
+from app.services.timezone import local_today
 
 
 WEEKDAY_NAMES = {
@@ -19,17 +21,21 @@ def date_menu(
 ) -> ReplyKeyboardMarkup:
     keyboard: list[list[KeyboardButton]] = []
 
-    today = date.today()
+    today = local_today()
 
     for offset in range(days_count):
-        selected_date = today + timedelta(days=offset)
+        selected_date = today + timedelta(
+            days=offset
+        )
 
         if offset == 0:
             label = "Сегодня"
         elif offset == 1:
             label = "Завтра"
         else:
-            label = WEEKDAY_NAMES[selected_date.weekday()]
+            label = WEEKDAY_NAMES[
+                selected_date.weekday()
+            ]
 
         button_text = (
             f"📅 {label}, "
