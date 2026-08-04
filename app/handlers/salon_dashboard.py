@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
@@ -124,7 +124,7 @@ async def open_salon_dashboard(
 
         salon = db.scalar(
             select(Salon)
-            .options(joinedload(Salon.branches))
+            .options(selectinload(Salon.branches))
             .where(Salon.id == salon.id)
         )
 
@@ -185,7 +185,7 @@ async def show_salon_branches(
 
         salon = db.scalar(
             select(Salon)
-            .options(joinedload(Salon.branches))
+            .options(selectinload(Salon.branches))
             .where(Salon.id == salon.id)
         )
 
