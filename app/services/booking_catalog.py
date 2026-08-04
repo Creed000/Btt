@@ -11,44 +11,23 @@ from app.services.subscription_access import (
 )
 
 
-def get_available_master_services(
-    db: Session,
-    master_id: int,
+def _validate_master_access(
+    master: Master,
     city_name: str,
-    category_name: str,
-) -> tuple[Master, list[Service]]:
-    """
-    Проверяет мастера и возвращает только услуги выбранной категории.
-
-    Выбрасывает ValueError, если мастер больше недоступен,
-    находится в другом городе, не относится к категории
-    или подписка его салона закончилась.
-    """
-    master = db.scalar(
-        select(Master)
-        .options(
-            joinedload(Master.user),
-            joinedload(Master.city),
-            joinedload(Master.salon),
-            selectinload(Master.services).joinedload(
-                Service.category
-            ),
-        )
-        .where(
-            Master.id == master_id,
-            Master.booking_enabled.is_(True),
-            Master.is_verified.is_(True),
-        )
-    )
-
-    if master is None:
-        raise ValueError(
-            "Мастер больше не принимает записи."
-        )
-
+) -> None:
     if master.user is None or not master.user.is_active:
         raise ValueError(
             "Аккаунт мастера временно недоступен."
+        )
+
+    if not master.is_verified:
+        raise ValueError(
+            "Профиль мастера больше не подтверждён."
+        )
+
+    if not master.booking_enabled:
+        raise ValueError(
+            "Мастер больше не принимает записи."
         )
 
     if (
@@ -67,6 +46,41 @@ def get_available_master_services(
 
         if not allowed:
             raise ValueError(reason)
+
+
+def get_available_master_services(
+    db: Session,
+    master_id: int,
+    city_name: str,
+    category_name: str,
+) -> tuple[Master, list[Service]]:
+    """
+    Проверяет мастера и возвращает только услуги выбранной категории.
+    """
+    master = db.scalar(
+        select(Master)
+        .options(
+            joinedload(Master.user),
+            joinedload(Master.city),
+            joinedload(Master.salon),
+            selectinload(Master.services).joinedload(
+                Service.category
+            ),
+        )
+        .where(
+            Master.id == master_id
+        )
+    )
+
+    if master is None:
+        raise ValueError(
+            "Мастер не найден."
+        )
+
+    _validate_master_access(
+        master,
+        city_name,
+    )
 
     services = list(
         db.scalars(
@@ -108,3 +122,73 @@ def get_available_master_services(
         )
 
     return master, services
+
+
+def resolve_selected_service(
+    db: Session,
+    service_id: int,
+    master_id: int,
+    city_name: str,
+    category_name: str,
+) -> Service:
+    """
+    Повторно проверяет выбранную услугу перед открытием календаря.
+
+    Защищает от старой или вручную отправленной кнопки.
+    """
+    service = db.scalar(
+        select(Service)
+        .options(
+            joinedload(Service.category),
+            joinedload(Service.master).joinedload(
+                Master.user
+            ),
+            joinedload(Service.master).joinedload(
+                Master.city
+            ),
+            joinedload(Service.master).joinedload(
+                Master.salon
+            ),
+        )
+        .where(
+            Service.id == service_id,
+            Service.master_id == master_id,
+        )
+    )
+
+    if service is None:
+        raise ValueError(
+            "Услуга не найдена или не принадлежит выбранному мастеру."
+        )
+
+    master = service.master
+
+    if master is None:
+        raise ValueError(
+            "Профиль мастера не найден."
+        )
+
+    _validate_master_access(
+        master,
+        city_name,
+    )
+
+    if (
+        service.category is None
+        or service.category.name != category_name
+    ):
+        raise ValueError(
+            "Услуга не относится к выбранной категории."
+        )
+
+    if service.duration < 15:
+        raise ValueError(
+            "У услуги указана некорректная длительность."
+        )
+
+    if service.price < 0:
+        raise ValueError(
+            "У услуги указана некорректная цена."
+        )
+
+    return service
