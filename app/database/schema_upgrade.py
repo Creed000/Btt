@@ -5,6 +5,7 @@ from sqlalchemy import inspect, text
 
 from app.database.base import Base
 from app.database.session import engine
+from app.services.timezone import local_naive_now
 
 # Импорт моделей нужен, чтобы Base.metadata видел все таблицы.
 import app.models  # noqa: F401
@@ -185,7 +186,7 @@ def upgrade_database_schema() -> None:
                 ),
             )
 
-            now = datetime.utcnow()
+            now = local_naive_now()
             trial_end = now + timedelta(days=14)
 
             connection.execute(
