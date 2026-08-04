@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -10,6 +10,7 @@ from app.handlers.admin_panel import admin_menu
 from app.keyboards.main import main_menu
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.timezone import local_naive_now
 
 
 PLAN_TITLES = {
@@ -275,7 +276,7 @@ async def activate_salon_plan(
             )
             return
 
-        now = datetime.utcnow()
+        now = local_naive_now()
 
         salon.plan = plan_code
         salon.subscription_status = "active"
@@ -341,9 +342,11 @@ async def disable_salon_subscription(
             )
             return
 
+        now = local_naive_now()
+
         salon.subscription_status = "cancelled"
-        salon.subscription_ends_at = datetime.utcnow()
-        salon.updated_at = datetime.utcnow()
+        salon.subscription_ends_at = now
+        salon.updated_at = now
 
         db.commit()
 
