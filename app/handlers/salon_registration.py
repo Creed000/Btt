@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import select
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
@@ -10,6 +10,7 @@ from app.keyboards.main import main_menu
 from app.models.branch import Branch
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.timezone import local_naive_now
 
 
 def salon_registration_menu() -> ReplyKeyboardMarkup:
@@ -35,7 +36,10 @@ def clear_salon_registration(
         context.user_data.pop(key, None)
 
 
-def make_slug(name: str, telegram_id: int) -> str:
+def make_slug(
+    name: str,
+    telegram_id: int,
+) -> str:
     value = name.lower().strip()
     value = re.sub(r"[^a-zа-я0-9]+", "-", value)
     value = value.strip("-")
@@ -166,10 +170,10 @@ async def process_salon_registration(
                 )
             )
 
-            if existing_slug is not None:
-                slug = f"{slug[:90]}-{int(datetime.utcnow().timestamp())}"
+            now = local_naive_now()
 
-            now = datetime.utcnow()
+            if existing_slug is not None:
+                slug = f"{slug[:90]}-{int(now.timestamp())}"
 
             salon = Salon(
                 owner_id=user.id,
@@ -181,6 +185,8 @@ async def process_salon_registration(
                 subscription_status="trial",
                 trial_ends_at=now + timedelta(days=14),
                 is_active=True,
+                created_at=now,
+                updated_at=now,
             )
 
             db.add(salon)
@@ -236,7 +242,7 @@ async def process_salon_registration(
             f"Slug: {salon_slug}\n"
             f"Тариф: free\n"
             f"Пробный период до: "
-            f"{trial_ends_at.strftime('%d.%m.%Y')}\n\n"
+            f"{trial_ends_at.strftime('%d.%m.%Y %H:%M')}\n\n"
             "Также создан главный филиал.",
             reply_markup=main_menu(role="owner"),
         )
