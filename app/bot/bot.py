@@ -8,12 +8,8 @@ from telegram.ext import (
 )
 
 from app.config.settings import settings
-from app.handlers.booking import booking_handler
 from app.handlers.health import health_handler
 from app.handlers.menu import menu_handler
-from app.handlers.profile import profile_handler
-from app.handlers.search import search_handler
-from app.handlers.settings import settings_handler
 from app.handlers.start import start_handler
 from app.handlers.telegram_id import telegram_id_handler
 from app.services.booking_reminders import (
@@ -99,13 +95,18 @@ async def global_error_handler(
     """
     Логирует любую необработанную ошибку Telegram-бота.
     """
-    error_text = "".join(
-        traceback.format_exception(
-            type(context.error),
-            context.error,
-            context.error.__traceback__,
+    error = context.error
+
+    if error is None:
+        error_text = "Неизвестная ошибка"
+    else:
+        error_text = "".join(
+            traceback.format_exception(
+                type(error),
+                error,
+                error.__traceback__,
+            )
         )
-    )
 
     logger.error(
         "Необработанная ошибка Telegram-бота:\n%s",
@@ -139,19 +140,15 @@ application = (
 )
 
 
-# Регистрация обработчиков команд.
+# Команды Telegram.
 application.add_handler(start_handler)
 application.add_handler(telegram_id_handler)
 application.add_handler(health_handler)
 
-# Регистрация остальных обработчиков.
+# Единый маршрутизатор всех текстовых кнопок и диалогов.
 application.add_handler(menu_handler)
-application.add_handler(booking_handler)
-application.add_handler(profile_handler)
-application.add_handler(search_handler)
-application.add_handler(settings_handler)
 
-# Глобальный обработчик непредвиденных ошибок.
+# Глобальный обработчик ошибок.
 application.add_error_handler(
     global_error_handler
 )
