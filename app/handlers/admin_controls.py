@@ -7,6 +7,12 @@ from app.handlers.admin_panel import admin_menu
 from app.keyboards.main import main_menu
 from app.models.master import Master
 from app.models.user import User
+from app.services.access_control import (
+    can_manage_admins,
+    can_manage_platform,
+    is_platform_admin,
+    is_platform_owner,
+)
 
 
 def admin_users_actions_menu(
@@ -15,7 +21,9 @@ def admin_users_actions_menu(
     keyboard: list[list[KeyboardButton]] = []
 
     for user in users:
-        if user.role in {"owner", "admin"}:
+        # Системных владельца и администраторов не показываем
+        # в обычных кнопках блокировки.
+        if is_platform_admin(user.telegram_id):
             continue
 
         if user.is_active:
@@ -88,16 +96,35 @@ def admin_masters_actions_menu(
     )
 
 
-def get_admin(
+def get_platform_admin(
     db,
     telegram_id: int,
 ) -> User | None:
-    return db.scalar(
+    user = db.scalar(
         select(User).where(
-            User.telegram_id == telegram_id,
-            User.role.in_({"admin", "owner"}),
-            User.is_active.is_(True),
+            User.telegram_id == telegram_id
         )
+    )
+
+    if not can_manage_platform(user):
+        return None
+
+    return user
+
+
+async def deny_access(
+    update: Update,
+    role: str | None = None,
+) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    await update.message.reply_text(
+        "⛔ У вас нет доступа к управлению SaaS-платформой.",
+        reply_markup=main_menu(
+            role=role,
+            telegram_id=update.effective_user.id,
+        ),
     )
 
 
@@ -113,16 +140,13 @@ async def change_user_active_status(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         target_user = db.scalar(
@@ -138,26 +162,27 @@ async def change_user_active_status(
             )
             return
 
-        if target_user.role == "owner":
+        if target_user.id == admin.id:
             await update.message.reply_text(
-                "⛔ Владельца системы блокировать нельзя.",
+                "⛔ Нельзя заблокировать собственный аккаунт.",
+                reply_markup=admin_menu(),
+            )
+            return
+
+        if is_platform_owner(target_user.telegram_id):
+            await update.message.reply_text(
+                "⛔ Главного владельца платформы блокировать нельзя.",
                 reply_markup=admin_menu(),
             )
             return
 
         if (
-            target_user.role == "admin"
-            and admin.role != "owner"
+            is_platform_admin(target_user.telegram_id)
+            and not can_manage_admins(admin)
         ):
             await update.message.reply_text(
-                "⛔ Только владелец может управлять администраторами.",
-                reply_markup=admin_menu(),
-            )
-            return
-
-        if target_user.id == admin.id:
-            await update.message.reply_text(
-                "⛔ Нельзя заблокировать собственный аккаунт.",
+                "⛔ Только главный владелец платформы "
+                "может управлять администраторами.",
                 reply_markup=admin_menu(),
             )
             return
@@ -204,16 +229,13 @@ async def change_master_verified_status(
     db = SessionLocal()
 
     try:
-        admin = get_admin(
+        admin = get_platform_admin(
             db,
             update.effective_user.id,
         )
 
         if admin is None:
-            await update.message.reply_text(
-                "⛔ У вас нет доступа.",
-                reply_markup=main_menu(),
-            )
+            await deny_access(update)
             return
 
         master = db.scalar(
@@ -230,6 +252,10 @@ async def change_master_verified_status(
             return
 
         master.is_verified = is_verified
+
+        if not is_verified:
+            master.booking_enabled = False
+
         db.commit()
 
         action = (
