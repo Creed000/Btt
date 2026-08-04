@@ -32,6 +32,18 @@ WEEKDAY_NAMES = {
 }
 
 
+def schedule_overview_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton("⚙️ Настроить расписание")],
+            [KeyboardButton("⬅️ Назад")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Расписание мастера",
+    )
+
+
 def schedule_weekday_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -94,6 +106,82 @@ def get_master(
     )
 
 
+async def show_master_schedule(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    db = SessionLocal()
+
+    try:
+        master = get_master(
+            db,
+            update.effective_user.id,
+        )
+
+        if master is None:
+            await update.message.reply_text(
+                "❌ Профиль мастера не найден.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        schedules = list(
+            db.scalars(
+                select(MasterSchedule)
+                .where(
+                    MasterSchedule.master_id == master.id
+                )
+                .order_by(MasterSchedule.weekday)
+            ).all()
+        )
+
+        schedule_map = {
+            item.weekday: item
+            for item in schedules
+        }
+
+        lines = [
+            "🗓 Моё расписание",
+            "",
+        ]
+
+        for weekday in range(7):
+            schedule = schedule_map.get(weekday)
+            day_name = WEEKDAY_NAMES[weekday]
+
+            if schedule is None:
+                lines.append(
+                    f"{day_name}: 09:00–18:00 (по умолчанию)"
+                )
+            elif not schedule.is_working:
+                lines.append(
+                    f"{day_name}: выходной"
+                )
+            else:
+                lines.append(
+                    f"{day_name}: "
+                    f"{schedule.work_start.strftime('%H:%M')}–"
+                    f"{schedule.work_end.strftime('%H:%M')}"
+                )
+
+        await update.message.reply_text(
+            "\n".join(lines),
+            reply_markup=schedule_overview_menu(),
+        )
+
+    except Exception:
+        await update.message.reply_text(
+            "❌ Не удалось загрузить расписание.",
+            reply_markup=main_menu(),
+        )
+
+    finally:
+        db.close()
+
+
 async def begin_schedule_setup(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -111,8 +199,7 @@ async def begin_schedule_setup(
 
         if master is None:
             await update.message.reply_text(
-                "❌ Профиль мастера не найден. "
-                "Сначала нажмите «💼 Стать мастером».",
+                "❌ Профиль мастера не найден.",
                 reply_markup=main_menu(),
             )
             return
@@ -124,8 +211,8 @@ async def begin_schedule_setup(
     context.user_data["schedule_setup"] = "weekday"
 
     await update.message.reply_text(
-        "🗓 Настройка расписания\n\n"
-        "Шаг 1. Выберите день недели:",
+        "⚙️ Настройка расписания\n\n"
+        "Выберите день недели:",
         reply_markup=schedule_weekday_menu(),
     )
 
@@ -147,9 +234,9 @@ async def process_schedule_setup(
     if text == "❌ Отменить настройку расписания":
         clear_schedule_setup(context)
 
-        await update.message.reply_text(
-            "❌ Настройка расписания отменена.",
-            reply_markup=main_menu(),
+        await show_master_schedule(
+            update,
+            context,
         )
         return True
 
@@ -242,16 +329,16 @@ async def process_schedule_setup(
             clear_schedule_setup(context)
 
             await update.message.reply_text(
-                f"✅ {WEEKDAY_NAMES[weekday]} отмечен как выходной.",
-                reply_markup=main_menu(),
+                f"✅ {WEEKDAY_NAMES[weekday]} отмечен как выходной."
             )
+            await show_master_schedule(update, context)
             return True
 
         if text == "🕘 Настроить рабочее время":
             context.user_data["schedule_setup"] = "start"
 
             await update.message.reply_text(
-                "Введите время начала работы в формате ЧЧ:ММ.\n\n"
+                "Введите начало работы в формате ЧЧ:ММ.\n\n"
                 "Например: 09:00"
             )
             return True
@@ -277,7 +364,7 @@ async def process_schedule_setup(
         context.user_data["schedule_setup"] = "end"
 
         await update.message.reply_text(
-            "Введите время окончания работы в формате ЧЧ:ММ.\n\n"
+            "Введите окончание работы в формате ЧЧ:ММ.\n\n"
             "Например: 18:00"
         )
         return True
@@ -308,7 +395,7 @@ async def process_schedule_setup(
 
         if end_time <= start_time:
             await update.message.reply_text(
-                "Время окончания должно быть позже времени начала."
+                "Время окончания должно быть позже начала."
             )
             return True
 
@@ -374,12 +461,9 @@ async def process_schedule_setup(
         clear_schedule_setup(context)
 
         await update.message.reply_text(
-            "✅ Расписание сохранено!\n\n"
-            f"День: {WEEKDAY_NAMES[weekday]}\n"
-            f"Рабочее время: "
-            f"{start_time.strftime('%H:%M')}–{end_time.strftime('%H:%M')}",
-            reply_markup=main_menu(),
+            "✅ Расписание сохранено!"
         )
+        await show_master_schedule(update, context)
         return True
 
     return False
