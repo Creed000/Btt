@@ -14,12 +14,51 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     APP_TIMEZONE: str = "Asia/Bishkek"
 
+    # Telegram ID главного владельца SaaS.
+    OWNER_TELEGRAM_ID: int | None = None
+
+    # Дополнительные администраторы через запятую:
+    # 123456789,987654321
+    ADMIN_TELEGRAM_IDS: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
     )
+
+    @property
+    def admin_telegram_ids(self) -> set[int]:
+        result: set[int] = set()
+
+        for value in self.ADMIN_TELEGRAM_IDS.split(","):
+            value = value.strip()
+
+            if not value:
+                continue
+
+            try:
+                result.add(int(value))
+            except ValueError:
+                continue
+
+        return result
+
+    def role_for_telegram_id(
+        self,
+        telegram_id: int,
+    ) -> str | None:
+        if (
+            self.OWNER_TELEGRAM_ID is not None
+            and telegram_id == self.OWNER_TELEGRAM_ID
+        ):
+            return "owner"
+
+        if telegram_id in self.admin_telegram_ids:
+            return "admin"
+
+        return None
 
     @field_validator("BOT_TOKEN")
     @classmethod
