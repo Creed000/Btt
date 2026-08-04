@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
@@ -6,10 +6,17 @@ from telegram.ext import ContextTypes
 
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
+from app.models.booking import Booking
 from app.models.master import Master
 from app.models.master_schedule import MasterSchedule
+from app.models.service import Service
 from app.models.user import User
 
+
+ACTIVE_BOOKING_STATUSES = {
+    "new",
+    "confirmed",
+}
 
 WEEKDAYS = {
     "📅 Понедельник": 0,
@@ -104,6 +111,84 @@ def get_master(
             Master.user_id == user.id
         )
     )
+
+
+def get_conflicting_bookings(
+    db,
+    master_id: int,
+    weekday: int,
+    work_start=None,
+    work_end=None,
+    make_day_off: bool = False,
+    days_ahead: int = 90,
+) -> list[Booking]:
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead)
+
+    bookings = list(
+        db.scalars(
+            select(Booking)
+            .where(
+                Booking.master_id == master_id,
+                Booking.booking_date >= today,
+                Booking.booking_date <= end_date,
+                Booking.status.in_(ACTIVE_BOOKING_STATUSES),
+            )
+            .order_by(
+                Booking.booking_date,
+                Booking.booking_time,
+            )
+        ).all()
+    )
+
+    conflicts: list[Booking] = []
+
+    for booking in bookings:
+        if booking.booking_date.weekday() != weekday:
+            continue
+
+        if make_day_off:
+            conflicts.append(booking)
+            continue
+
+        service = db.scalar(
+            select(Service).where(
+                Service.id == booking.service_id
+            )
+        )
+
+        duration = (
+            service.duration
+            if service is not None
+            else 30
+        )
+
+        booking_start = datetime.combine(
+            booking.booking_date,
+            booking.booking_time,
+        )
+
+        booking_end = booking_start + timedelta(
+            minutes=duration
+        )
+
+        schedule_start = datetime.combine(
+            booking.booking_date,
+            work_start,
+        )
+
+        schedule_end = datetime.combine(
+            booking.booking_date,
+            work_end,
+        )
+
+        if (
+            booking_start < schedule_start
+            or booking_end > schedule_end
+        ):
+            conflicts.append(booking)
+
+    return conflicts
 
 
 async def show_master_schedule(
@@ -233,11 +318,7 @@ async def process_schedule_setup(
 
     if text == "❌ Отменить настройку расписания":
         clear_schedule_setup(context)
-
-        await show_master_schedule(
-            update,
-            context,
-        )
+        await show_master_schedule(update, context)
         return True
 
     if stage == "weekday":
@@ -284,6 +365,25 @@ async def process_schedule_setup(
                         "Профиль мастера не найден."
                     )
 
+                conflicts = get_conflicting_bookings(
+                    db,
+                    master.id,
+                    weekday,
+                    make_day_off=True,
+                )
+
+                if conflicts:
+                    numbers = ", ".join(
+                        f"#{booking.id}"
+                        for booking in conflicts[:10]
+                    )
+
+                    raise ValueError(
+                        "Нельзя сделать день выходным: "
+                        f"есть активные записи {numbers}. "
+                        "Сначала отмените или перенесите их."
+                    )
+
                 schedule = db.scalar(
                     select(MasterSchedule).where(
                         MasterSchedule.master_id == master.id,
@@ -309,7 +409,7 @@ async def process_schedule_setup(
 
                 await update.message.reply_text(
                     f"❌ {error}",
-                    reply_markup=main_menu(),
+                    reply_markup=schedule_overview_menu(),
                 )
                 return True
 
@@ -412,6 +512,26 @@ async def process_schedule_setup(
                     "Профиль мастера не найден."
                 )
 
+            conflicts = get_conflicting_bookings(
+                db,
+                master.id,
+                weekday,
+                work_start=start_time,
+                work_end=end_time,
+            )
+
+            if conflicts:
+                numbers = ", ".join(
+                    f"#{booking.id}"
+                    for booking in conflicts[:10]
+                )
+
+                raise ValueError(
+                    "Нельзя сохранить новый график: "
+                    f"записи {numbers} находятся вне выбранного времени. "
+                    "Сначала отмените или перенесите их."
+                )
+
             schedule = db.scalar(
                 select(MasterSchedule).where(
                     MasterSchedule.master_id == master.id,
@@ -441,7 +561,7 @@ async def process_schedule_setup(
 
             await update.message.reply_text(
                 f"❌ {error}",
-                reply_markup=main_menu(),
+                reply_markup=schedule_overview_menu(),
             )
             return True
 
