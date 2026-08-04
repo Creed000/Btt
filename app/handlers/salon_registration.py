@@ -10,6 +10,7 @@ from app.keyboards.main import main_menu
 from app.models.branch import Branch
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.access_control import is_platform_admin
 from app.services.timezone import local_naive_now
 
 
@@ -200,7 +201,10 @@ async def process_salon_registration(
 
             db.add(branch)
 
-            if user.role == "client":
+            # Обычный пользователь, создавший салон, становится
+            # его владельцем независимо от предыдущей роли client/master.
+            # Системные администраторы сохраняют роль admin.
+            if not is_platform_admin(user.telegram_id):
                 user.role = "owner"
 
             db.add(user)
@@ -244,7 +248,10 @@ async def process_salon_registration(
             f"Пробный период до: "
             f"{trial_ends_at.strftime('%d.%m.%Y %H:%M')}\n\n"
             "Также создан главный филиал.",
-            reply_markup=main_menu(role="owner"),
+            reply_markup=main_menu(
+                role=user.role,
+                telegram_id=user.telegram_id,
+            ),
         )
         return True
 
