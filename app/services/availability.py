@@ -4,11 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.booking import Booking
+from app.models.master_schedule import MasterSchedule
 from app.models.service import Service
 
 
-WORK_START = time(hour=9, minute=0)
-WORK_END = time(hour=18, minute=0)
+DEFAULT_WORK_START = time(hour=9, minute=0)
+DEFAULT_WORK_END = time(hour=18, minute=0)
 SLOT_STEP_MINUTES = 30
 
 ACTIVE_BOOKING_STATUSES = {
@@ -24,6 +25,31 @@ def _overlaps(
     second_end: datetime,
 ) -> bool:
     return first_start < second_end and second_start < first_end
+
+
+def get_master_working_hours(
+    db: Session,
+    master_id: int,
+    booking_date: date,
+) -> tuple[time, time] | None:
+    weekday = booking_date.weekday()
+
+    schedule = db.scalar(
+        select(MasterSchedule).where(
+            MasterSchedule.master_id == master_id,
+            MasterSchedule.weekday == weekday,
+        )
+    )
+
+    # Для старых мастеров без настроенного расписания
+    # временно используем стандартный график 09:00–18:00.
+    if schedule is None:
+        return DEFAULT_WORK_START, DEFAULT_WORK_END
+
+    if not schedule.is_working:
+        return None
+
+    return schedule.work_start, schedule.work_end
 
 
 def get_available_slots(
@@ -44,6 +70,22 @@ def get_available_slots(
             "Услуга не найдена или не принадлежит выбранному мастеру."
         )
 
+    working_hours = get_master_working_hours(
+        db,
+        master_id,
+        booking_date,
+    )
+
+    if working_hours is None:
+        return []
+
+    work_start, work_end = working_hours
+
+    if work_end <= work_start:
+        raise ValueError(
+            "У мастера неверно настроено рабочее время."
+        )
+
     bookings = list(
         db.scalars(
             select(Booking)
@@ -59,18 +101,21 @@ def get_available_slots(
 
     day_start = datetime.combine(
         booking_date,
-        WORK_START,
+        work_start,
     )
+
     day_end = datetime.combine(
         booking_date,
-        WORK_END,
+        work_end,
     )
 
     now = datetime.now()
     current_start = day_start
+
     service_duration = timedelta(
         minutes=service.duration
     )
+
     step = timedelta(
         minutes=SLOT_STEP_MINUTES
     )
