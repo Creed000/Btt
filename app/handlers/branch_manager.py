@@ -7,6 +7,7 @@ from app.keyboards.main import main_menu
 from app.models.branch import Branch
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.subscription_limits import can_add_branch
 
 
 def branch_creation_menu() -> ReplyKeyboardMarkup:
@@ -34,8 +35,62 @@ async def begin_branch_creation(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
+    if update.message is None or update.effective_user is None:
         return
+
+    db = SessionLocal()
+
+    try:
+        user = db.scalar(
+            select(User).where(
+                User.telegram_id == update.effective_user.id
+            )
+        )
+
+        if user is None:
+            await update.message.reply_text(
+                "❌ Пользователь не найден. Отправьте /start.",
+                reply_markup=main_menu(),
+            )
+            return
+
+        if user.role not in {"owner", "admin"}:
+            await update.message.reply_text(
+                "⛔ Добавлять филиалы может только владелец салона.",
+                reply_markup=main_menu(role=user.role),
+            )
+            return
+
+        salon = db.scalar(
+            select(Salon).where(
+                Salon.owner_id == user.id,
+                Salon.is_active.is_(True),
+            )
+        )
+
+        if salon is None:
+            await update.message.reply_text(
+                "❌ Активный салон не найден.",
+                reply_markup=main_menu(role=user.role),
+            )
+            return
+
+        allowed, reason = can_add_branch(
+            db,
+            salon,
+        )
+
+        if not allowed:
+            await update.message.reply_text(
+                "⛔ Лимит тарифа достигнут.\n\n"
+                f"{reason}\n\n"
+                "Откройте «💳 Тариф и подписка», чтобы выбрать другой тариф.",
+                reply_markup=main_menu(role=user.role),
+            )
+            return
+
+    finally:
+        db.close()
 
     clear_branch_creation(context)
     context.user_data["branch_creation"] = "name"
@@ -124,6 +179,14 @@ async def process_branch_creation(
                 raise ValueError(
                     "Активный салон не найден."
                 )
+
+            allowed, reason = can_add_branch(
+                db,
+                salon,
+            )
+
+            if not allowed:
+                raise ValueError(reason)
 
             existing_branch = db.scalar(
                 select(Branch).where(
