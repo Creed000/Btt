@@ -13,13 +13,13 @@ def upgrade_booking_service_foreign_key() -> None:
     Меняет внешний ключ bookings.service_id на ON DELETE RESTRICT.
 
     PostgreSQL:
-    - находит все внешние ключи таблицы bookings для service_id;
-    - удаляет старое ограничение, включая ON DELETE CASCADE;
-    - создаёт новое ограничение ON DELETE RESTRICT.
+    - находит только FOREIGN KEY для bookings.service_id;
+    - удаляет старое ограничение;
+    - создаёт безопасное ON DELETE RESTRICT.
 
     SQLite:
-    - ничего не меняет, потому что ALTER CONSTRAINT там не поддерживается;
-    - новые SQLite-базы получат RESTRICT из модели Booking.
+    - обновление пропускается;
+    - новые базы получают RESTRICT из модели Booking.
     """
     if engine.dialect.name != "postgresql":
         logger.info(
@@ -42,12 +42,15 @@ def upgrade_booking_service_foreign_key() -> None:
             connection.execute(
                 text(
                     """
-                    SELECT DISTINCT constraint_name
-                    FROM information_schema.key_column_usage
-                    WHERE table_schema = current_schema()
-                      AND table_name = 'bookings'
-                      AND column_name = 'service_id'
-                      AND constraint_name IS NOT NULL
+                    SELECT DISTINCT tc.constraint_name
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.constraint_schema = kcu.constraint_schema
+                    WHERE tc.table_schema = current_schema()
+                      AND tc.table_name = 'bookings'
+                      AND tc.constraint_type = 'FOREIGN KEY'
+                      AND kcu.column_name = 'service_id'
                     """
                 )
             ).scalars()
