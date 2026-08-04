@@ -115,3 +115,10 @@ class Master(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    time_blocks = relationship(
+        "MasterTimeBlock",
+        back_populates="master",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
