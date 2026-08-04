@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
@@ -7,6 +9,7 @@ from app.database.session import SessionLocal
 from app.models.booking import Booking
 from app.models.master import Master
 from app.repositories.user_repository import UserRepository
+from app.services.timezone import local_naive_now
 
 
 STATUS_NAMES = {
@@ -17,11 +20,26 @@ STATUS_NAMES = {
 }
 
 
-def profile_menu(bookings: list[Booking]) -> ReplyKeyboardMarkup:
+def booking_starts_at(
+    booking: Booking,
+) -> datetime:
+    return datetime.combine(
+        booking.booking_date,
+        booking.booking_time,
+    )
+
+
+def profile_menu(
+    bookings: list[Booking],
+) -> ReplyKeyboardMarkup:
     keyboard: list[list[KeyboardButton]] = []
+    now = local_naive_now()
 
     for booking_item in bookings:
-        if booking_item.status in {"new", "confirmed"}:
+        if (
+            booking_item.status in {"new", "confirmed"}
+            and booking_starts_at(booking_item) > now
+        ):
             keyboard.append(
                 [
                     KeyboardButton(
@@ -30,7 +48,9 @@ def profile_menu(bookings: list[Booking]) -> ReplyKeyboardMarkup:
                 ]
             )
 
-    keyboard.append([KeyboardButton("⬅️ Назад")])
+    keyboard.append(
+        [KeyboardButton("⬅️ Назад")]
+    )
 
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
@@ -44,7 +64,10 @@ async def profile(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None:
+    if (
+        update.message is None
+        or update.effective_user is None
+    ):
         return
 
     db = SessionLocal()
@@ -66,9 +89,13 @@ async def profile(
                 select(Booking)
                 .options(
                     joinedload(Booking.service),
-                    joinedload(Booking.master).joinedload(Master.user),
+                    joinedload(Booking.master).joinedload(
+                        Master.user
+                    ),
                 )
-                .where(Booking.client_id == user.id)
+                .where(
+                    Booking.client_id == user.id
+                )
                 .order_by(
                     Booking.booking_date.desc(),
                     Booking.booking_time.desc(),
@@ -95,7 +122,9 @@ async def profile(
         ]
 
         if not bookings:
-            profile_lines.append("Записей пока нет.")
+            profile_lines.append(
+                "Записей пока нет."
+            )
         else:
             for booking_item in bookings:
                 service_title = (
@@ -105,12 +134,15 @@ async def profile(
                 )
 
                 master_name = "Мастер"
+
                 if (
                     booking_item.master
                     and booking_item.master.user
                     and booking_item.master.user.first_name
                 ):
-                    master_name = booking_item.master.user.first_name
+                    master_name = (
+                        booking_item.master.user.first_name
+                    )
 
                 status_text = STATUS_NAMES.get(
                     booking_item.status,
@@ -123,20 +155,29 @@ async def profile(
                         f"№{booking_item.id}",
                         f"💼 {service_title}",
                         f"👤 Мастер: {master_name}",
-                        f"📅 {booking_item.booking_date.strftime('%d.%m.%Y')}",
-                        f"🕒 {booking_item.booking_time.strftime('%H:%M')}",
+                        (
+                            f"📅 "
+                            f"{booking_item.booking_date.strftime('%d.%m.%Y')}"
+                        ),
+                        (
+                            f"🕒 "
+                            f"{booking_item.booking_time.strftime('%H:%M')}"
+                        ),
                         f"Статус: {status_text}",
                     ]
                 )
 
         await update.message.reply_text(
             "\n".join(profile_lines),
-            reply_markup=profile_menu(bookings),
+            reply_markup=profile_menu(
+                bookings
+            ),
         )
 
     except Exception:
         await update.message.reply_text(
-            "❌ Не удалось загрузить личный кабинет. Попробуйте позже."
+            "❌ Не удалось загрузить личный кабинет. "
+            "Попробуйте позже."
         )
 
     finally:
@@ -144,6 +185,8 @@ async def profile(
 
 
 profile_handler = MessageHandler(
-    filters.Regex(r"^👤 Личный кабинет$"),
+    filters.Regex(
+        r"^👤 Личный кабинет$"
+    ),
     profile,
 )
