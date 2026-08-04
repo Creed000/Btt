@@ -11,6 +11,7 @@ from app.models.master import Master
 from app.models.master_time_block import MasterTimeBlock
 from app.models.service import Service
 from app.models.user import User
+from app.services.timezone import local_today
 
 
 ACTIVE_BOOKING_STATUSES = {
@@ -199,7 +200,7 @@ async def process_time_block_creation(
             )
             return True
 
-        if block_date < date.today():
+        if block_date < local_today():
             await update.message.reply_text(
                 "Нельзя выбрать прошедшую дату."
             )
@@ -446,7 +447,7 @@ async def show_master_time_blocks(
                 select(MasterTimeBlock)
                 .where(
                     MasterTimeBlock.master_id == master.id,
-                    MasterTimeBlock.block_date >= date.today(),
+                    MasterTimeBlock.block_date >= local_today(),
                 )
                 .order_by(
                     MasterTimeBlock.block_date,
