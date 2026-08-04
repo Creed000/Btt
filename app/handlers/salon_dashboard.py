@@ -17,6 +17,7 @@ def salon_owner_menu() -> ReplyKeyboardMarkup:
             [KeyboardButton("🏢 Мой салон")],
             [KeyboardButton("🏬 Мои филиалы")],
             [KeyboardButton("➕ Добавить филиал")],
+            [KeyboardButton("➕ Добавить мастера")],
             [KeyboardButton("💳 Тариф и подписка")],
             [KeyboardButton("⬅️ Назад")],
         ],
@@ -92,9 +93,7 @@ async def open_salon_dashboard(
 
         salon = db.scalar(
             select(Salon)
-            .options(
-                joinedload(Salon.branches),
-            )
+            .options(joinedload(Salon.branches))
             .where(
                 Salon.owner_id == user.id,
                 Salon.is_active.is_(True),
@@ -108,8 +107,6 @@ async def open_salon_dashboard(
             )
             return
 
-        branches_count = len(salon.branches)
-
         await update.message.reply_text(
             "🏢 Кабинет салона\n\n"
             f"ID: {salon.id}\n"
@@ -118,7 +115,7 @@ async def open_salon_dashboard(
             f"Город: {salon.city or '—'}\n"
             f"Адрес: {salon.address or '—'}\n"
             f"Телефон: {salon.phone or '—'}\n"
-            f"Филиалов: {branches_count}\n"
+            f"Филиалов: {len(salon.branches)}\n"
             f"Тариф: {salon.plan}\n"
             f"Подписка: {subscription_status_text(salon)}",
             reply_markup=salon_owner_menu(),
@@ -243,8 +240,7 @@ async def show_salon_subscription(
         await update.message.reply_text(
             "💳 Тариф и подписка\n\n"
             f"Текущий тариф: {salon.plan}\n"
-            f"Статус: {subscription_status_text(salon)}\n\n"
-            "Доступные тарифы и оплату подключим следующим этапом.",
+            f"Статус: {subscription_status_text(salon)}",
             reply_markup=salon_owner_menu(),
         )
 
