@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.database.session import SessionLocal
 from app.models.booking import Booking
@@ -94,9 +95,26 @@ def create_booking(
 
         db.add(booking)
         db.commit()
-        db.refresh(booking)
 
-        return booking
+        loaded_booking = db.scalar(
+            select(Booking)
+            .options(
+                joinedload(Booking.client),
+                joinedload(Booking.master).joinedload(Master.user),
+                joinedload(Booking.service),
+            )
+            .where(Booking.id == booking.id)
+        )
+
+        if loaded_booking is None:
+            raise RuntimeError(
+                "Созданная запись не найдена."
+            )
+
+        # Загруженные связи останутся доступны после закрытия сессии.
+        db.expunge_all()
+
+        return loaded_booking
 
     except Exception:
         db.rollback()
