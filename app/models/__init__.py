@@ -6,6 +6,7 @@ from .client import Client
 from .master import Master
 from .master_day_off import MasterDayOff
 from .master_schedule import MasterSchedule
+from .master_time_block import MasterTimeBlock
 from .role import Role
 from .salon import Salon
 from .service import Service
@@ -22,6 +23,7 @@ __all__ = [
     "Master",
     "MasterSchedule",
     "MasterDayOff",
+    "MasterTimeBlock",
     "Client",
     "Service",
     "Booking",
