@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     ContextTypes,
@@ -38,8 +38,25 @@ async def post_init(
     application: Application,
 ) -> None:
     """
-    Запускается после инициализации Telegram Application.
+    Настраивает команды и фоновые задачи после запуска приложения.
     """
+    await application.bot.set_my_commands(
+        [
+            BotCommand(
+                command="start",
+                description="Открыть главное меню",
+            ),
+            BotCommand(
+                command="id",
+                description="Показать мой Telegram ID",
+            ),
+        ]
+    )
+
+    logger.info(
+        "Команды Telegram успешно зарегистрированы."
+    )
+
     if application.job_queue is None:
         logger.error(
             "JobQueue недоступен. "
