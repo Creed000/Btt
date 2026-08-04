@@ -23,8 +23,6 @@ def main_menu(
         ],
     ]
 
-    # Для старых вызовов без has_salon сохраняем совместимость:
-    # роль owner означает владельца салона.
     owns_salon = (
         has_salon
         if has_salon is not None
@@ -40,15 +38,15 @@ def main_menu(
             [KeyboardButton("🏢 Создать салон")]
         )
 
-    # Админ-панель показываем системным администраторам.
-    # Реальный доступ дополнительно проверяется внутри обработчиков.
-    has_admin_button = (
-        role == "admin"
-        or (
-            telegram_id is not None
-            and is_platform_admin(telegram_id)
+    # Если Telegram ID передан, права берём только из Railway.
+    # Роль admin используется лишь для совместимости со старыми
+    # вызовами, где Telegram ID ещё не передаётся.
+    if telegram_id is not None:
+        has_admin_button = is_platform_admin(
+            telegram_id
         )
-    )
+    else:
+        has_admin_button = role == "admin"
 
     if has_admin_button:
         keyboard.append(
