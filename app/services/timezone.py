@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -26,6 +26,13 @@ def local_now() -> datetime:
     Возвращает текущее локальное время приложения.
     """
     return datetime.now(APP_TIMEZONE)
+
+
+def local_today() -> date:
+    """
+    Возвращает текущую локальную дату приложения.
+    """
+    return local_now().date()
 
 
 def local_naive_now() -> datetime:
