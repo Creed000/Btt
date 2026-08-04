@@ -6,9 +6,16 @@ from telegram.ext import ContextTypes
 
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
+from app.models.booking import Booking
 from app.models.master import Master
 from app.models.master_day_off import MasterDayOff
 from app.models.user import User
+
+
+ACTIVE_BOOKING_STATUSES = {
+    "new",
+    "confirmed",
+}
 
 
 def day_off_menu() -> ReplyKeyboardMarkup:
@@ -206,6 +213,30 @@ async def process_day_off_creation(
         if existing is not None:
             raise ValueError(
                 "Эта дата уже добавлена как выходной."
+            )
+
+        active_bookings = list(
+            db.scalars(
+                select(Booking)
+                .where(
+                    Booking.master_id == master.id,
+                    Booking.booking_date == selected_date,
+                    Booking.status.in_(ACTIVE_BOOKING_STATUSES),
+                )
+                .order_by(Booking.booking_time)
+            ).all()
+        )
+
+        if active_bookings:
+            booking_numbers = ", ".join(
+                f"#{booking.id}"
+                for booking in active_bookings[:10]
+            )
+
+            raise ValueError(
+                "Нельзя поставить выходной: "
+                f"на эту дату есть активные записи {booking_numbers}. "
+                "Сначала отмените или перенесите их."
             )
 
         day_off = MasterDayOff(
