@@ -8,6 +8,7 @@ from app.models.branch import Branch
 from app.models.master import Master
 from app.models.salon import Salon
 from app.models.user import User
+from app.services.subscription_access import require_active_salon_access
 from app.services.subscription_limits import can_add_master
 
 
@@ -75,6 +76,8 @@ async def begin_master_invite(
                 reply_markup=main_menu(role=owner.role),
             )
             return
+
+        require_active_salon_access(salon)
 
         allowed, reason = can_add_master(
             db,
@@ -165,6 +168,8 @@ async def process_master_invite(
                 raise ValueError(
                     "Активный салон не найден."
                 )
+
+            require_active_salon_access(salon)
 
             allowed, reason = can_add_master(
                 db,
