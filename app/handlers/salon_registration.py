@@ -251,6 +251,7 @@ async def process_salon_registration(
             reply_markup=main_menu(
                 role=user.role,
                 telegram_id=user.telegram_id,
+                has_salon=True,
             ),
         )
         return True
