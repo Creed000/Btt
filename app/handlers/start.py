@@ -1,9 +1,9 @@
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import CommandHandler, ContextTypes
 
+from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
 from app.services.user_service import UserService
-from app.database.session import SessionLocal
 
 
 async def start(
@@ -22,14 +22,22 @@ async def start(
         )
 
         await update.message.reply_text(
-            (
-                f"👋 Добро пожаловать, "
-                f"{user.first_name}!"
-            ),
+            f"👋 Добро пожаловать, {user.first_name}!",
             reply_markup=main_menu(
                 role=user.role,
                 telegram_id=user.telegram_id,
             ),
         )
+
+    except Exception:
+        db.rollback()
+        raise
+
     finally:
         db.close()
+
+
+start_handler = CommandHandler(
+    "start",
+    start,
+)
