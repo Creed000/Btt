@@ -251,42 +251,37 @@ async def process_booking_reminders(
 
             changed = False
 
-            # Окно напоминания примерно за 24 часа.
-            if (
-                timedelta(hours=23)
-                <= time_left
-                <= timedelta(hours=25)
-            ):
+            # Если до записи осталось не больше двух часов,
+            # отправляем только самое актуальное напоминание.
+            if time_left <= timedelta(hours=2):
                 changed = (
                     await _process_reminder_period(
                         application=application,
                         booking=booking,
                         reminder_title=(
-                            "Напоминание: запись примерно через 24 часа"
-                        ),
-                        common_flag_name="reminder_24h_sent",
-                        client_flag_name="reminder_24h_client_sent",
-                        master_flag_name="reminder_24h_master_sent",
-                    )
-                    or changed
-                )
-
-            # Окно напоминания примерно за 2 часа.
-            if (
-                timedelta(minutes=90)
-                <= time_left
-                <= timedelta(minutes=150)
-            ):
-                changed = (
-                    await _process_reminder_period(
-                        application=application,
-                        booking=booking,
-                        reminder_title=(
-                            "Напоминание: запись примерно через 2 часа"
+                            "Напоминание: запись менее чем через 2 часа"
                         ),
                         common_flag_name="reminder_2h_sent",
                         client_flag_name="reminder_2h_client_sent",
                         master_flag_name="reminder_2h_master_sent",
+                    )
+                    or changed
+                )
+
+            # Напоминание за сутки отправляем в любой момент
+            # от 24 до 2 часов до записи. Это защищает от пропуска
+            # уведомления после перезапуска или простоя Railway.
+            elif time_left <= timedelta(hours=24):
+                changed = (
+                    await _process_reminder_period(
+                        application=application,
+                        booking=booking,
+                        reminder_title=(
+                            "Напоминание: запись в течение ближайших 24 часов"
+                        ),
+                        common_flag_name="reminder_24h_sent",
+                        client_flag_name="reminder_24h_client_sent",
+                        master_flag_name="reminder_24h_master_sent",
                     )
                     or changed
                 )
