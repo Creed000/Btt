@@ -9,6 +9,7 @@ from telegram.ext import (
 
 from app.config.settings import settings
 from app.handlers.booking import booking_handler
+from app.handlers.health import health_handler
 from app.handlers.menu import menu_handler
 from app.handlers.profile import profile_handler
 from app.handlers.search import search_handler
@@ -49,6 +50,10 @@ async def post_init(
             BotCommand(
                 command="id",
                 description="Показать мой Telegram ID",
+            ),
+            BotCommand(
+                command="health",
+                description="Проверить состояние системы",
             ),
         ]
     )
@@ -137,6 +142,7 @@ application = (
 # Регистрация обработчиков команд.
 application.add_handler(start_handler)
 application.add_handler(telegram_id_handler)
+application.add_handler(health_handler)
 
 # Регистрация остальных обработчиков.
 application.add_handler(menu_handler)
