@@ -1,14 +1,11 @@
 from telegram import KeyboardButton, ReplyKeyboardMarkup
 
-
-ADMIN_ROLES = {
-    "admin",
-    "owner",
-}
+from app.services.access_control import is_platform_admin
 
 
 def main_menu(
     role: str | None = None,
+    telegram_id: int | None = None,
 ) -> ReplyKeyboardMarkup:
     keyboard = [
         [
@@ -25,6 +22,7 @@ def main_menu(
         ],
     ]
 
+    # Роль owner означает владельца конкретного салона.
     if role == "owner":
         keyboard.append(
             [KeyboardButton("🏢 Кабинет салона")]
@@ -34,7 +32,11 @@ def main_menu(
             [KeyboardButton("🏢 Создать салон")]
         )
 
-    if role in ADMIN_ROLES:
+    # Админ-панель показываем только ID из настроек Railway.
+    if (
+        telegram_id is not None
+        and is_platform_admin(telegram_id)
+    ):
         keyboard.append(
             [KeyboardButton("👑 Админ-панель")]
         )
