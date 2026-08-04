@@ -17,6 +17,7 @@ def admin_menu() -> ReplyKeyboardMarkup:
             [KeyboardButton("🧑‍💼 Мастера")],
             [KeyboardButton("📅 Все записи")],
             [KeyboardButton("📊 Статистика")],
+            [KeyboardButton("💳 Подписки салонов")],
             [KeyboardButton("⬅️ Назад")],
         ],
         resize_keyboard=True,
@@ -51,7 +52,7 @@ async def open_admin_panel(
         if user.role not in {"admin", "owner"}:
             await update.message.reply_text(
                 "⛔ У вас нет доступа к админ-панели.",
-                reply_markup=main_menu(),
+                reply_markup=main_menu(role=user.role),
             )
             return
 
