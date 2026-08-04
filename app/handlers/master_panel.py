@@ -78,7 +78,7 @@ async def become_master(
                 description="Новый мастер BTT",
                 slug=f"master-{user.telegram_id}",
                 rating=5.0,
-                booking_enabled=True,
+                booking_enabled=False,
                 is_verified=False,
             )
 
@@ -92,8 +92,9 @@ async def become_master(
 
             await update.message.reply_text(
                 "🎉 Профиль мастера создан!\n\n"
-                "Теперь выберите город, добавьте услуги "
-                "и настройте рабочее расписание.",
+                "Приём записей пока выключен.\n"
+                "Выберите город, добавьте услуги, настройте расписание "
+                "и дождитесь подтверждения администратора.",
                 reply_markup=master_panel_menu(master),
             )
             return
