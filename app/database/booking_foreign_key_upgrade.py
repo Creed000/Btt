@@ -10,16 +10,11 @@ logger = logging.getLogger(__name__)
 
 def upgrade_booking_service_foreign_key() -> None:
     """
-    Меняет внешний ключ bookings.service_id на ON DELETE RESTRICT.
+    Проверяет внешний ключ bookings.service_id.
 
-    PostgreSQL:
-    - находит только FOREIGN KEY для bookings.service_id;
-    - удаляет старое ограничение;
-    - создаёт безопасное ON DELETE RESTRICT.
-
-    SQLite:
-    - обновление пропускается;
-    - новые базы получают RESTRICT из модели Booking.
+    Если правило уже RESTRICT или NO ACTION, ничего не меняет.
+    Если используется CASCADE или другое правило, заменяет его
+    на ON DELETE RESTRICT.
     """
     if engine.dialect.name != "postgresql":
         logger.info(
@@ -38,25 +33,47 @@ def upgrade_booking_service_foreign_key() -> None:
         return
 
     with engine.begin() as connection:
-        constraint_names = list(
+        foreign_keys = list(
             connection.execute(
                 text(
                     """
-                    SELECT DISTINCT tc.constraint_name
+                    SELECT
+                        tc.constraint_name,
+                        rc.delete_rule
                     FROM information_schema.table_constraints AS tc
                     JOIN information_schema.key_column_usage AS kcu
                       ON tc.constraint_name = kcu.constraint_name
                      AND tc.constraint_schema = kcu.constraint_schema
+                    JOIN information_schema.referential_constraints AS rc
+                      ON tc.constraint_name = rc.constraint_name
+                     AND tc.constraint_schema = rc.constraint_schema
                     WHERE tc.table_schema = current_schema()
                       AND tc.table_name = 'bookings'
                       AND tc.constraint_type = 'FOREIGN KEY'
                       AND kcu.column_name = 'service_id'
                     """
                 )
-            ).scalars()
+            ).mappings()
         )
 
-        for constraint_name in constraint_names:
+        if (
+            len(foreign_keys) == 1
+            and foreign_keys[0]["delete_rule"] in {
+                "RESTRICT",
+                "NO ACTION",
+            }
+        ):
+            logger.info(
+                "Внешний ключ bookings.service_id уже безопасен: %s.",
+                foreign_keys[0]["delete_rule"],
+            )
+            return
+
+        for foreign_key in foreign_keys:
+            constraint_name = foreign_key[
+                "constraint_name"
+            ]
+
             safe_name = constraint_name.replace(
                 '"',
                 '""',
