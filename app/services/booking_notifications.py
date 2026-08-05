@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 
 from telegram.ext import Application
 
@@ -6,6 +7,12 @@ from app.models.booking import Booking
 
 
 logger = logging.getLogger(__name__)
+
+
+class NotificationResult(str, Enum):
+    SENT = "sent"
+    DISABLED = "disabled"
+    FAILED = "failed"
 
 
 def _notifications_allowed(
@@ -26,7 +33,7 @@ def _notifications_allowed(
 async def notify_master_about_new_booking(
     application: Application,
     booking: Booking,
-) -> bool:
+) -> NotificationResult:
     master_user = (
         booking.master.user
         if booking.master and booking.master.user
@@ -38,7 +45,7 @@ async def notify_master_about_new_booking(
             "У записи %s отсутствует пользователь мастера",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
 
     if not _notifications_allowed(master_user):
         logger.info(
@@ -46,7 +53,7 @@ async def notify_master_about_new_booking(
             "Запись: %s",
             booking.id,
         )
-        return False
+        return NotificationResult.DISABLED
 
     try:
         await application.bot.send_message(
@@ -64,7 +71,7 @@ async def notify_master_about_new_booking(
                 f"{booking.client.first_name if booking.client else '—'}"
             ),
         )
-        return True
+        return NotificationResult.SENT
 
     except Exception:
         logger.exception(
@@ -72,13 +79,13 @@ async def notify_master_about_new_booking(
             "по записи %s",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
 
 
 async def notify_client_about_status(
     application: Application,
     booking: Booking,
-) -> bool:
+) -> NotificationResult:
     client = booking.client
 
     if client is None:
@@ -86,7 +93,7 @@ async def notify_client_about_status(
             "У записи %s отсутствует клиент",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
 
     if not _notifications_allowed(client):
         logger.info(
@@ -94,7 +101,7 @@ async def notify_client_about_status(
             "Запись: %s",
             booking.id,
         )
-        return False
+        return NotificationResult.DISABLED
 
     status_messages = {
         "confirmed": "✅ Ваша запись подтверждена.",
@@ -107,7 +114,7 @@ async def notify_client_about_status(
     )
 
     if status_text is None:
-        return False
+        return NotificationResult.FAILED
 
     master_name = "—"
 
@@ -135,7 +142,7 @@ async def notify_client_about_status(
                 f"Мастер: {master_name}"
             ),
         )
-        return True
+        return NotificationResult.SENT
 
     except Exception:
         logger.exception(
@@ -143,13 +150,13 @@ async def notify_client_about_status(
             "по записи %s",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
 
 
 async def notify_master_about_client_cancellation(
     application: Application,
     booking: Booking,
-) -> bool:
+) -> NotificationResult:
     master_user = (
         booking.master.user
         if booking.master and booking.master.user
@@ -161,7 +168,7 @@ async def notify_master_about_client_cancellation(
             "У записи %s отсутствует пользователь мастера",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
 
     if not _notifications_allowed(master_user):
         logger.info(
@@ -169,7 +176,7 @@ async def notify_master_about_client_cancellation(
             "по настройкам. Запись: %s",
             booking.id,
         )
-        return False
+        return NotificationResult.DISABLED
 
     try:
         await application.bot.send_message(
@@ -187,11 +194,30 @@ async def notify_master_about_client_cancellation(
                 f"{booking.client.first_name if booking.client else '—'}"
             ),
         )
-        return True
+        return NotificationResult.SENT
 
     except Exception:
         logger.exception(
             "Не удалось уведомить мастера об отмене записи %s",
             booking.id,
         )
-        return False
+        return NotificationResult.FAILED
+
+
+def notification_result_text(
+    result: NotificationResult,
+    recipient_name: str,
+) -> str:
+    if result == NotificationResult.SENT:
+        return f"{recipient_name} получил уведомление."
+
+    if result == NotificationResult.DISABLED:
+        return (
+            f"У {recipient_name.lower()} уведомления выключены "
+            "в настройках."
+        )
+
+    return (
+        f"Уведомление для {recipient_name.lower()} "
+        "доставить не удалось."
+    )
