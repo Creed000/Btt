@@ -58,11 +58,17 @@ async def open_settings_panel(
             user.language or "Русский",
         )
 
+        notifications_text = (
+            "✅ включены"
+            if user.notifications_enabled
+            else "🔕 выключены"
+        )
+
         await update.message.reply_text(
             "⚙️ Настройки аккаунта\n\n"
             f"🌐 Язык: {language}\n"
             f"🕒 Часовой пояс: {user.timezone}\n"
-            f"🔔 Уведомления: включены\n\n"
+            f"🔔 Уведомления: {notifications_text}\n\n"
             "Выберите раздел:",
             reply_markup=settings_menu(),
         )
