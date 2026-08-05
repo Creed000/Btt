@@ -9,6 +9,9 @@ from app.database.session import SessionLocal
 from app.models.booking import Booking
 from app.models.master import Master
 from app.repositories.user_repository import UserRepository
+from app.services.booking_time_display import (
+    format_booking_time_for_user,
+)
 from app.services.timezone import local_naive_now
 
 
@@ -149,20 +152,21 @@ async def profile(
                     booking_item.status,
                 )
 
+                booking_time_text = (
+                    format_booking_time_for_user(
+                        booking_date=booking_item.booking_date,
+                        booking_time=booking_item.booking_time,
+                        user=user,
+                    )
+                )
+
                 profile_lines.extend(
                     [
                         "",
                         f"№{booking_item.id}",
                         f"💼 {service_title}",
                         f"👤 Мастер: {master_name}",
-                        (
-                            f"📅 "
-                            f"{booking_item.booking_date.strftime('%d.%m.%Y')}"
-                        ),
-                        (
-                            f"🕒 "
-                            f"{booking_item.booking_time.strftime('%H:%M')}"
-                        ),
+                        f"🕒 {booking_time_text}",
                         f"Статус: {status_text}",
                     ]
                 )
