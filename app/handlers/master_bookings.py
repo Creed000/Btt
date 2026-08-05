@@ -14,6 +14,9 @@ from app.services.booking_notifications import (
     notification_result_text,
     notify_client_about_status,
 )
+from app.services.booking_time_display import (
+    format_booking_time_for_user,
+)
 from app.services.timezone import local_naive_now
 
 
@@ -126,7 +129,11 @@ def get_master_by_telegram_id(
         return None
 
     return db.scalar(
-        select(Master).where(
+        select(Master)
+        .options(
+            joinedload(Master.user),
+        )
+        .where(
             Master.user_id == user.id
         )
     )
@@ -209,6 +216,14 @@ async def show_master_bookings(
                     booking.status,
                 )
 
+                booking_time_text = (
+                    format_booking_time_for_user(
+                        booking_date=booking.booking_date,
+                        booking_time=booking.booking_time,
+                        user=master.user,
+                    )
+                )
+
                 lines.extend(
                     [
                         "",
@@ -216,14 +231,7 @@ async def show_master_bookings(
                         f"👤 Клиент: {client_name}",
                         f"📱 Телефон: {client_phone}",
                         f"💼 Услуга: {service_title}",
-                        (
-                            "📅 Дата: "
-                            f"{booking.booking_date.strftime('%d.%m.%Y')}"
-                        ),
-                        (
-                            "🕒 Время: "
-                            f"{booking.booking_time.strftime('%H:%M')}"
-                        ),
+                        f"🕒 {booking_time_text}",
                         f"Статус: {status_text}",
                     ]
                 )
