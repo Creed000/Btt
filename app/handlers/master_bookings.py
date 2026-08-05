@@ -352,9 +352,11 @@ async def change_master_booking_status(
         db.commit()
         db.expunge_all()
 
-        await notify_client_about_status(
-            context.application,
-            booking,
+        notification_delivered = (
+            await notify_client_about_status(
+                context.application,
+                booking,
+            )
         )
 
         result_messages = {
@@ -369,8 +371,18 @@ async def change_master_booking_status(
             ),
         }
 
+        notification_text = (
+            "Клиент получил уведомление."
+            if notification_delivered
+            else (
+                "Статус сохранён, но уведомление клиенту "
+                "доставить не удалось."
+            )
+        )
+
         await update.message.reply_text(
-            result_messages[new_status],
+            f"{result_messages[new_status]}\n"
+            f"{notification_text}",
             reply_markup=main_menu(
                 telegram_id=update.effective_user.id,
             ),
