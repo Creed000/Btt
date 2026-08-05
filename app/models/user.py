@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, BigInteger, String
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -9,7 +9,10 @@ from app.database.base import Base
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
 
     telegram_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -17,49 +20,65 @@ class User(Base):
         index=True,
     )
 
-    username: Mapped[str | None] = mapped_column(String(64))
+    username: Mapped[str | None] = mapped_column(
+        String(64)
+    )
 
-    first_name: Mapped[str] = mapped_column(String(100))
+    first_name: Mapped[str] = mapped_column(
+        String(100)
+    )
 
-    last_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(
+        String(100)
+    )
 
-    phone: Mapped[str | None] = mapped_column(String(30))
+    phone: Mapped[str | None] = mapped_column(
+        String(30)
+    )
 
     language: Mapped[str] = mapped_column(
         String(10),
         default="ru",
+        nullable=False,
     )
 
-    # Роль пользователя
     # client | master | admin | owner
     role: Mapped[str] = mapped_column(
         String(20),
         default="client",
+        nullable=False,
     )
 
-    # Часовой пояс
     timezone: Mapped[str] = mapped_column(
         String(50),
-        default="Europe/Moscow",
+        default="Asia/Bishkek",
+        nullable=False,
+    )
+
+    notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
     )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
+        nullable=False,
     )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
+        nullable=False,
     )
 
-    # Последняя активность
     last_seen: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
+        nullable=False,
     )
 
-    # Связь с профилем мастера
     master = relationship(
         "Master",
         back_populates="user",
