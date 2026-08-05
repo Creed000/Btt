@@ -8,6 +8,21 @@ from app.models.booking import Booking
 logger = logging.getLogger(__name__)
 
 
+def _notifications_allowed(
+    user,
+) -> bool:
+    if user is None:
+        return False
+
+    return bool(
+        getattr(
+            user,
+            "notifications_enabled",
+            True,
+        )
+    )
+
+
 async def notify_master_about_new_booking(
     application: Application,
     booking: Booking,
@@ -21,6 +36,14 @@ async def notify_master_about_new_booking(
     if master_user is None:
         logger.warning(
             "У записи %s отсутствует пользователь мастера",
+            booking.id,
+        )
+        return False
+
+    if not _notifications_allowed(master_user):
+        logger.info(
+            "Уведомление мастеру пропущено по настройкам. "
+            "Запись: %s",
             booking.id,
         )
         return False
@@ -56,9 +79,19 @@ async def notify_client_about_status(
     application: Application,
     booking: Booking,
 ) -> bool:
-    if booking.client is None:
+    client = booking.client
+
+    if client is None:
         logger.warning(
             "У записи %s отсутствует клиент",
+            booking.id,
+        )
+        return False
+
+    if not _notifications_allowed(client):
+        logger.info(
+            "Уведомление клиенту пропущено по настройкам. "
+            "Запись: %s",
             booking.id,
         )
         return False
@@ -89,7 +122,7 @@ async def notify_client_about_status(
 
     try:
         await application.bot.send_message(
-            chat_id=booking.client.telegram_id,
+            chat_id=client.telegram_id,
             text=(
                 f"{status_text}\n\n"
                 f"Номер: #{booking.id}\n"
@@ -126,6 +159,14 @@ async def notify_master_about_client_cancellation(
     if master_user is None:
         logger.warning(
             "У записи %s отсутствует пользователь мастера",
+            booking.id,
+        )
+        return False
+
+    if not _notifications_allowed(master_user):
+        logger.info(
+            "Уведомление мастеру об отмене пропущено "
+            "по настройкам. Запись: %s",
             booking.id,
         )
         return False
