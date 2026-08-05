@@ -107,6 +107,16 @@ async def profile(
             ).unique().all()
         )
 
+        notifications_text = (
+            "✅ включены"
+            if getattr(
+                user,
+                "notifications_enabled",
+                True,
+            )
+            else "🔕 выключены"
+        )
+
         profile_lines = [
             "👤 Личный кабинет",
             "",
@@ -120,6 +130,7 @@ async def profile(
             f"📱 Телефон: {user.phone or '—'}",
             f"🎭 Роль: {user.role}",
             f"🕒 Часовой пояс: {user.timezone}",
+            f"🔔 Уведомления: {notifications_text}",
             "",
             "📅 Последние записи:",
         ]
