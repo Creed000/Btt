@@ -68,5 +68,3 @@ async def show_main_menu(
 
     finally:
         db.close()
-    finally:
-        db.close()
