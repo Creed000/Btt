@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes
 
 from app.database.session import SessionLocal
 from app.keyboards.main import main_menu
+from app.models.master import Master
 from app.models.salon import Salon
 from app.models.user import User
 
@@ -13,12 +14,6 @@ async def show_main_menu(
     context: ContextTypes.DEFAULT_TYPE,
     text: str = "Главное меню:",
 ) -> None:
-    """
-    Показывает главное меню с учётом:
-    - текущей роли;
-    - Telegram ID;
-    - наличия активного салона.
-    """
     if update.message is None or update.effective_user is None:
         return
 
@@ -38,6 +33,7 @@ async def show_main_menu(
         )
 
         has_salon = False
+        has_master = False
 
         if user is not None:
             salon_id = db.scalar(
@@ -49,7 +45,16 @@ async def show_main_menu(
                 .limit(1)
             )
 
+            master_id = db.scalar(
+                select(Master.id)
+                .where(
+                    Master.user_id == user.id
+                )
+                .limit(1)
+            )
+
             has_salon = salon_id is not None
+            has_master = master_id is not None
 
         await update.message.reply_text(
             text,
@@ -57,8 +62,11 @@ async def show_main_menu(
                 role=role,
                 telegram_id=update.effective_user.id,
                 has_salon=has_salon,
+                has_master=has_master,
             ),
         )
 
+    finally:
+        db.close()
     finally:
         db.close()
