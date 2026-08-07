@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from sqlalchemy.orm import joinedload
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
@@ -9,7 +10,9 @@ from app.models.service import Service
 from app.models.user import User
 
 
-def master_panel_menu(master: Master) -> ReplyKeyboardMarkup:
+def master_panel_menu(
+    master: Master,
+) -> ReplyKeyboardMarkup:
     booking_button = (
         "⛔ Выключить запись"
         if master.booking_enabled
@@ -40,7 +43,10 @@ async def become_master(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    if update.message is None or update.effective_user is None:
+    if (
+        update.message is None
+        or update.effective_user is None
+    ):
         return
 
     db = SessionLocal()
@@ -48,26 +54,39 @@ async def become_master(
     try:
         user = db.scalar(
             select(User).where(
-                User.telegram_id == update.effective_user.id
+                User.telegram_id
+                == update.effective_user.id
             )
         )
 
         if user is None:
             await update.message.reply_text(
-                "❌ Пользователь не найден. Сначала отправьте /start.",
-                reply_markup=main_menu(),
+                "❌ Пользователь не найден. "
+                "Сначала отправьте /start.",
+                reply_markup=main_menu(
+                    telegram_id=update.effective_user.id,
+                ),
             )
             return
 
         if not user.is_active:
             await update.message.reply_text(
                 "❌ Ваш аккаунт временно отключён.",
-                reply_markup=main_menu(role=user.role),
+                reply_markup=main_menu(
+                    role=user.role,
+                    telegram_id=user.telegram_id,
+                ),
             )
             return
 
         master = db.scalar(
-            select(Master).where(
+            select(Master)
+            .options(
+                joinedload(Master.city),
+                joinedload(Master.salon),
+                joinedload(Master.branch),
+            )
+            .where(
                 Master.user_id == user.id
             )
         )
@@ -75,13 +94,16 @@ async def become_master(
         if master is None:
             master = Master(
                 user_id=user.id,
-                description="Новый мастер BTT",
+                description="Новый мастер GlowFlow",
                 slug=f"master-{user.telegram_id}",
                 rating=5.0,
                 booking_enabled=False,
                 is_verified=False,
             )
 
+            # Только обычный клиент становится master.
+            # owner/admin сохраняют свою основную роль,
+            # но при этом получают профиль мастера.
             if user.role == "client":
                 user.role = "master"
 
@@ -93,14 +115,19 @@ async def become_master(
             await update.message.reply_text(
                 "🎉 Профиль мастера создан!\n\n"
                 "Приём записей пока выключен.\n"
-                "Выберите город, добавьте услуги, настройте расписание "
-                "и дождитесь подтверждения администратора.",
-                reply_markup=master_panel_menu(master),
+                "Выберите город, добавьте услуги, "
+                "настройте расписание и дождитесь "
+                "подтверждения администратора.",
+                reply_markup=master_panel_menu(
+                    master
+                ),
             )
             return
 
         services_count = db.scalar(
-            select(func.count(Service.id)).where(
+            select(
+                func.count(Service.id)
+            ).where(
                 Service.master_id == master.id
             )
         ) or 0
@@ -135,15 +162,20 @@ async def become_master(
             f"✅ Проверка профиля: "
             f"{'пройдена' if master.is_verified else 'ожидается'}\n"
             f"💼 Услуг добавлено: {services_count}",
-            reply_markup=master_panel_menu(master),
+            reply_markup=master_panel_menu(
+                master
+            ),
         )
 
     except Exception:
         db.rollback()
 
         await update.message.reply_text(
-            "❌ Не удалось открыть кабинет мастера. Попробуйте позже.",
-            reply_markup=main_menu(),
+            "❌ Не удалось открыть кабинет мастера. "
+            "Попробуйте позже.",
+            reply_markup=main_menu(
+                telegram_id=update.effective_user.id,
+            ),
         )
 
     finally:
