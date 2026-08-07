@@ -7,6 +7,7 @@ def main_menu(
     role: str | None = None,
     telegram_id: int | None = None,
     has_salon: bool | None = None,
+    has_master: bool | None = None,
 ) -> ReplyKeyboardMarkup:
     keyboard = [
         [
@@ -15,7 +16,11 @@ def main_menu(
         ],
         [
             KeyboardButton("👤 Личный кабинет"),
-            KeyboardButton("💼 Стать мастером"),
+            KeyboardButton(
+                "💼 Кабинет мастера"
+                if has_master
+                else "💼 Стать мастером"
+            ),
         ],
         [
             KeyboardButton("ℹ️ Помощь"),
@@ -38,9 +43,7 @@ def main_menu(
             [KeyboardButton("🏢 Создать салон")]
         )
 
-    # Если Telegram ID передан, права берём только из Railway.
-    # Роль admin используется лишь для совместимости со старыми
-    # вызовами, где Telegram ID ещё не передаётся.
+    # Если Telegram ID передан, источник прав — Railway.
     if telegram_id is not None:
         has_admin_button = is_platform_admin(
             telegram_id
