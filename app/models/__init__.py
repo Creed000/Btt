@@ -10,6 +10,7 @@ from .master_time_block import MasterTimeBlock
 from .role import Role
 from .salon import Salon
 from .service import Service
+from .subscription_plan_request import SubscriptionPlanRequest
 from .user import User
 
 
@@ -27,4 +28,5 @@ __all__ = [
     "Client",
     "Service",
     "Booking",
+    "SubscriptionPlanRequest",
 ]
