@@ -1,0 +1,449 @@
+import asyncio
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+from telegram.ext import Application
+
+from app.database.session import SessionLocal
+from app.models.booking import Booking
+from app.models.master import Master
+from app.services.timezone import local_naive_now
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReminderPayload:
+    booking_id: int
+    reminder_kind: str
+    client_telegram_id: int | None
+    master_telegram_id: int | None
+    client_notifications_enabled: bool
+    master_notifications_enabled: bool
+    client_sent: bool
+    master_sent: bool
+    client_name: str
+    master_name: str
+    service_title: str
+    date_text: str
+    time_text: str
+
+
+def _booking_datetime(
+    booking: Booking,
+) -> datetime:
+    return datetime.combine(
+        booking.booking_date,
+        booking.booking_time,
+    )
+
+
+def _notifications_enabled(
+    user,
+) -> bool:
+    if user is None:
+        return False
+
+    # Совместимость со старой БД до upgrade:
+    # если поля ещё нет, уведомления считаем включёнными.
+    return bool(
+        getattr(
+            user,
+            "notifications_enabled",
+            True,
+        )
+    )
+
+
+def _flag_value(
+    booking: Booking,
+    name: str,
+) -> bool:
+    return bool(
+        getattr(
+            booking,
+            name,
+            False,
+        )
+    )
+
+
+def _build_payload(
+    booking: Booking,
+    reminder_kind: str,
+) -> ReminderPayload:
+    client = booking.client
+    master_user = (
+        booking.master.user
+        if booking.master
+        and booking.master.user
+        else None
+    )
+
+    prefix = (
+        "reminder_24h"
+        if reminder_kind == "24h"
+        else "reminder_2h"
+    )
+
+    return ReminderPayload(
+        booking_id=booking.id,
+        reminder_kind=reminder_kind,
+        client_telegram_id=(
+            client.telegram_id
+            if client is not None
+            else None
+        ),
+        master_telegram_id=(
+            master_user.telegram_id
+            if master_user is not None
+            else None
+        ),
+        client_notifications_enabled=(
+            _notifications_enabled(client)
+        ),
+        master_notifications_enabled=(
+            _notifications_enabled(master_user)
+        ),
+        client_sent=_flag_value(
+            booking,
+            f"{prefix}_client_sent",
+        ),
+        master_sent=_flag_value(
+            booking,
+            f"{prefix}_master_sent",
+        ),
+        client_name=(
+            client.first_name
+            if client is not None
+            and client.first_name
+            else "Клиент"
+        ),
+        master_name=(
+            master_user.first_name
+            if master_user is not None
+            and master_user.first_name
+            else "Мастер"
+        ),
+        service_title=(
+            booking.service.title
+            if booking.service is not None
+            else "Услуга"
+        ),
+        date_text=booking.booking_date.strftime(
+            "%d.%m.%Y"
+        ),
+        time_text=booking.booking_time.strftime(
+            "%H:%M"
+        ),
+    )
+
+
+def _load_due_reminders() -> list[ReminderPayload]:
+    """
+    Только синхронная работа с SQLAlchemy.
+    Вызывается через asyncio.to_thread().
+    """
+    db = SessionLocal()
+
+    try:
+        now = local_naive_now()
+        search_until = now + timedelta(
+            hours=25,
+        )
+
+        bookings = list(
+            db.scalars(
+                select(Booking)
+                .options(
+                    joinedload(Booking.client),
+                    joinedload(Booking.service),
+                    joinedload(
+                        Booking.master
+                    ).joinedload(
+                        Master.user
+                    ),
+                )
+                .where(
+                    Booking.status == "confirmed",
+                    Booking.booking_date
+                    >= now.date(),
+                    Booking.booking_date
+                    <= search_until.date(),
+                )
+                .order_by(
+                    Booking.booking_date,
+                    Booking.booking_time,
+                )
+            ).unique().all()
+        )
+
+        payloads: list[
+            ReminderPayload
+        ] = []
+
+        for booking in bookings:
+            starts_at = _booking_datetime(
+                booking
+            )
+            time_left = (
+                starts_at - now
+            )
+
+            if (
+                time_left.total_seconds()
+                <= 0
+            ):
+                continue
+
+            if (
+                timedelta(hours=23)
+                <= time_left
+                <= timedelta(hours=25)
+            ):
+                payload = _build_payload(
+                    booking,
+                    "24h",
+                )
+
+                if (
+                    not payload.client_sent
+                    or not payload.master_sent
+                ):
+                    payloads.append(
+                        payload
+                    )
+
+            if (
+                timedelta(minutes=90)
+                <= time_left
+                <= timedelta(minutes=150)
+            ):
+                payload = _build_payload(
+                    booking,
+                    "2h",
+                )
+
+                if (
+                    not payload.client_sent
+                    or not payload.master_sent
+                ):
+                    payloads.append(
+                        payload
+                    )
+
+        return payloads
+
+    finally:
+        db.close()
+
+
+def _mark_recipient_sent(
+    booking_id: int,
+    reminder_kind: str,
+    recipient: str,
+) -> bool:
+    """
+    Ставит флаг только если запись всё ещё confirmed.
+    """
+    db = SessionLocal()
+
+    try:
+        booking = db.scalar(
+            select(Booking).where(
+                Booking.id
+                == booking_id
+            )
+        )
+
+        if (
+            booking is None
+            or booking.status
+            != "confirmed"
+        ):
+            return False
+
+        prefix = (
+            "reminder_24h"
+            if reminder_kind == "24h"
+            else "reminder_2h"
+        )
+
+        field_name = (
+            f"{prefix}_{recipient}_sent"
+        )
+
+        if bool(
+            getattr(
+                booking,
+                field_name,
+                False,
+            )
+        ):
+            return True
+
+        setattr(
+            booking,
+            field_name,
+            True,
+        )
+
+        db.add(booking)
+        db.commit()
+        return True
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Не удалось сохранить флаг "
+            "%s/%s для записи %s",
+            reminder_kind,
+            recipient,
+            booking_id,
+        )
+        return False
+
+    finally:
+        db.close()
+
+
+def _title(
+    reminder_kind: str,
+) -> str:
+    if reminder_kind == "24h":
+        return (
+            "Напоминание: запись примерно "
+            "через 24 часа"
+        )
+
+    return (
+        "Напоминание: запись примерно "
+        "через 2 часа"
+    )
+
+
+async def _send_client(
+    application: Application,
+    payload: ReminderPayload,
+) -> bool:
+    if payload.client_sent:
+        return True
+
+    if (
+        payload.client_telegram_id
+        is None
+        or not payload.client_notifications_enabled
+    ):
+        return False
+
+    try:
+        await application.bot.send_message(
+            chat_id=payload.client_telegram_id,
+            text=(
+                f"⏰ {_title(payload.reminder_kind)}\n\n"
+                f"Запись #{payload.booking_id}\n"
+                f"Услуга: {payload.service_title}\n"
+                f"Мастер: {payload.master_name}\n"
+                f"Дата: {payload.date_text}\n"
+                f"Время: {payload.time_text}"
+            ),
+        )
+
+        return await asyncio.to_thread(
+            _mark_recipient_sent,
+            payload.booking_id,
+            payload.reminder_kind,
+            "client",
+        )
+
+    except Exception:
+        logger.exception(
+            "Не удалось отправить %s "
+            "напоминание клиенту по записи %s",
+            payload.reminder_kind,
+            payload.booking_id,
+        )
+        return False
+
+
+async def _send_master(
+    application: Application,
+    payload: ReminderPayload,
+) -> bool:
+    if payload.master_sent:
+        return True
+
+    if (
+        payload.master_telegram_id
+        is None
+        or not payload.master_notifications_enabled
+    ):
+        return False
+
+    try:
+        await application.bot.send_message(
+            chat_id=payload.master_telegram_id,
+            text=(
+                f"⏰ {_title(payload.reminder_kind)}\n\n"
+                f"Запись #{payload.booking_id}\n"
+                f"Клиент: {payload.client_name}\n"
+                f"Услуга: {payload.service_title}\n"
+                f"Дата: {payload.date_text}\n"
+                f"Время: {payload.time_text}"
+            ),
+        )
+
+        return await asyncio.to_thread(
+            _mark_recipient_sent,
+            payload.booking_id,
+            payload.reminder_kind,
+            "master",
+        )
+
+    except Exception:
+        logger.exception(
+            "Не удалось отправить %s "
+            "напоминание мастеру по записи %s",
+            payload.reminder_kind,
+            payload.booking_id,
+        )
+        return False
+
+
+async def process_booking_reminders(
+    application: Application,
+) -> None:
+    """
+    Не блокирует Telegram event loop синхронными
+    SQLAlchemy-запросами.
+
+    БД читается/обновляется в worker thread,
+    Telegram API остаётся полностью async.
+    """
+    try:
+        payloads = await asyncio.to_thread(
+            _load_due_reminders
+        )
+
+        for payload in payloads:
+            # Клиент и мастер независимы:
+            # ошибка одного не мешает второму.
+            await _send_client(
+                application,
+                payload,
+            )
+
+            await _send_master(
+                application,
+                payload,
+            )
+
+    except Exception:
+        logger.exception(
+            "Ошибка при обработке "
+            "напоминаний о записях"
+        )
